@@ -340,8 +340,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         $altnames = array();
         do_input_validation($pconfig, $reqdfields, $reqdfieldsn, $input_errors);
-
-        // further (and maybe final) validation
         if (isset($pconfig['altname_value']) && $pconfig['certmethod'] != "import" && $pconfig['certmethod'] != "existing") {
             /* subjectAltNames */
             foreach ($pconfig['altname_type'] as $altname_seq => $altname_type) {
