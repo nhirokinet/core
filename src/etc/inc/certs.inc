@@ -269,6 +269,48 @@ function cert_create(&$cert, $caref, $keylen, $lifetime, $dn, $digest_alg = 'sha
     return true;
 }
 
+function sign_cert_for_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_extensions = 'usr_cert')
+{
+    $ca = &lookup_ca($caref);
+    if (!$ca) {
+        return false;
+    }
+
+    $ca_str_crt = base64_decode($ca['crt']);
+    $ca_str_key = base64_decode($ca['prv']);
+    $ca_res_crt = openssl_x509_read($ca_str_crt);
+    $ca_res_key = openssl_pkey_get_private(array(0 => $ca_str_key, 1 => ""));
+    if (!$ca_res_key) {
+        return false;
+    }
+    $ca_serial = ++$ca['serial'];
+
+    $args = array(
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        'x509_extensions' => $x509_extensions,
+        'digest_alg' => $digest_alg,
+        'encrypt_key' => false
+    );
+
+    // self sign the certificate
+    $res_crt = openssl_csr_sign($csr, $ca_res_crt, $ca_res_key, $lifetime,
+           $args, $ca_serial);
+    if (!$res_crt) {
+        return false;
+    }
+
+    // export our certificate data
+    if (!openssl_x509_export($res_crt, $str_crt)) {
+        return false;
+    }
+
+    // return our certificate information
+    $cert['caref'] = $caref;
+    $cert['crt'] = base64_encode($str_crt);
+
+    return true;
+}
+
 function csr_get_subject($str_crt, $decode = true)
 {
     if ($decode) {

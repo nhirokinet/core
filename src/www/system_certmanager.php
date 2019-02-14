@@ -89,6 +89,7 @@ $cert_methods = array(
     "import" => gettext("Import an existing Certificate"),
     "internal" => gettext("Create an internal Certificate"),
     "external" => gettext("Create a Certificate Signing Request"),
+    "sign_cert_for_csr" => gettext("Sign for a Certificate Signing Request"),
 );
 $cert_keylens = array( "512", "1024", "2048", "3072", "4096", "8192");
 $openssl_digest_algs = array("sha1", "sha224", "sha256", "sha384", "sha512");
@@ -125,9 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
         $pconfig['keylen'] = "2048";
         $pconfig['digest_alg'] = "sha256";
+        $pconfig['digest_alg_sign_csr'] = "sha256";
         $pconfig['csr_keylen'] = "2048";
         $pconfig['csr_digest_alg'] = "sha256";
         $pconfig['lifetime'] = "365";
+        $pconfig['lifetime_sign_csr'] = "365";
         $pconfig['cert_type'] = "usr_cert";
         $pconfig['cert'] = null;
         $pconfig['key'] = null;
@@ -330,10 +333,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         } elseif ($pconfig['certmethod'] == "existing") {
             $reqdfields = array("certref");
             $reqdfieldsn = array(gettext("Existing Certificate Choice"));
+        } elseif ($pconfig['certmethod'] == 'sign_cert_for_csr') {
+            $reqdfields = array("caref_sign_csr", "csr", "lifetime_sign_csr", "digest_alg_sign_csr");
+            $reqdfieldsn = array(gettext("Certificate authority"), gettext("CSR file"), gettext("Lifetime"), gettext("Digest Algorithm"));
         }
 
         $altnames = array();
         do_input_validation($pconfig, $reqdfields, $reqdfieldsn, $input_errors);
+
+        // further (and maybe final) validation
         if (isset($pconfig['altname_value']) && $pconfig['certmethod'] != "import" && $pconfig['certmethod'] != "existing") {
             /* subjectAltNames */
             foreach ($pconfig['altname_type'] as $altname_seq => $altname_type) {
@@ -386,7 +394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     if (preg_match("/[\!\@\#\$\%\^\(\)\~\?\>\<\&\/\\\,\"\']/", $pconfig[$reqdfields[$i]])) {
                         $input_errors[] = gettext("The field 'Distinguished name Common Name' contains invalid characters.");
                     }
-                } elseif (($reqdfields[$i] != "descr") && preg_match("/[\!\@\#\$\%\^\(\)\~\?\>\<\&\/\\\,\"\']/", $pconfig[$reqdfields[$i]])) {
+                } elseif (($reqdfields[$i] != "descr" && $reqdfields[$i] != "csr") && preg_match("/[\!\@\#\$\%\^\(\)\~\?\>\<\&\/\\\,\"\']/", $pconfig[$reqdfields[$i]])) {
                     $input_errors[] = sprintf(gettext("The field '%s' contains invalid characters."), $reqdfieldsn[$i]);
                 }
             }
@@ -402,6 +410,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 $input_errors[] = gettext("Please select a valid Key Length.");
             }
             if ($pconfig['certmethod'] == "external" && !in_array($pconfig["csr_digest_alg"], $openssl_digest_algs)) {
+                $input_errors[] = gettext("Please select a valid Digest Algorithm.");
+            }
+            if ($pconfig['certmethod'] == "sign_csr_for_crt" && !in_array($pconfig["digest_alg_sign_csr"], $openssl_digest_algs)) {
                 $input_errors[] = gettext("Please select a valid Digest Algorithm.");
             }
         }
@@ -453,6 +464,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         $pconfig['digest_alg'],
                         $pconfig['cert_type']
                     )) {
+                        $input_errors = array();
+                        while ($ssl_err = openssl_error_string()) {
+                            $input_errors[] = gettext("openssl library returns:") . " " . $ssl_err;
+                        }
+                    }
+                }
+
+                if ($pconfig['certmethod'] === 'sign_cert_for_csr') {
+                    if (!sign_cert_for_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'], $pconfig['digest_alg_sign_csr'])) {
                         $input_errors = array();
                         while ($ssl_err = openssl_error_string()) {
                             $input_errors[] = gettext("openssl library returns:") . " " . $ssl_err;
@@ -682,6 +702,7 @@ if (empty($act)) {
             $("#internal").addClass("hidden");
             $("#external").addClass("hidden");
             $("#existing").addClass("hidden");
+            $("#sign_cert_for_csr").addClass("hidden");
             if ($(this).val() == "import") {
                 $("#import").removeClass("hidden");
             } else if ($(this).val() == "internal") {
@@ -690,6 +711,8 @@ if (empty($act)) {
             } else if ($(this).val() == "external") {
                 $("#external").removeClass("hidden");
                 $("#altNameTr").detach().appendTo("#external > tbody:first");
+            } else if ($(this).val() == "sign_cert_for_csr") {
+                $("#sign_cert_for_csr").removeClass("hidden");
             } else {
                 $("#existing").removeClass("hidden");
             }
@@ -827,6 +850,66 @@ $( document ).ready(function() {
                     <textarea name="key" id="key" cols="65" rows="7" class="formfld_cert"><?=$pconfig['key'];?></textarea>
                     <div class="hidden" data-for="help_for_key">
                       <?=gettext("Paste a private key in X.509 PEM format here.");?>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- sign_cert_for_csr -->
+            <table id="sign_cert_for_csr" class="table table-striped opnsense_standard_table_form">
+              <thead>
+                <tr>
+                  <th colspan="2"><?=gettext("Sign CSR");?></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="width:22%"><?=gettext("Certificate authority");?></td>
+                  <td style="width:78%">
+                    <select name='caref_sign_csr' id='caref_sign_csr'>
+  <?php
+                    foreach ($a_ca as $ca) :
+                        if (!$ca['prv']) {
+                            continue;
+                        }?>
+                      <option value="<?=$ca['refid'];?>" <?=isset($pconfig['caref_sign_csr']) && isset($ca['refid']) && $pconfig['caref_sign_csr'] == $ca['refid'] ? 'selected="selected"' : '';?>><?=$ca['descr'];?></option>
+  <?php
+                    endforeach; ?>
+                    </select>
+                    <div class="hidden" id="no_caref_sign_csr">
+                      <?=sprintf(gettext("No internal Certificate Authorities have been defined. You must %sadd%s an internal CA before creating an internal certificate."),'<a href="system_camanager.php?act=new&amp;method=internal">','</a>');?>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width:22%"><a id="help_for_csr_sign" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
+                  <td style="width:78%">
+                    <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea>
+                    <div class="hidden" data-for="help_for_csr">
+                      <?=gettext("Paste the CSR file here.");?>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Lifetime");?> (<?=gettext("days");?>)</td>
+                  <td>
+                    <input name="lifetime_sign_csr" type="text" id="lifetime_sign_csr" size="5" value="<?=$pconfig['lifetime_sign_csr'];?>"/>
+                  </td>
+                </tr>
+                <tr>
+                  <td><a id="help_for_digest_alg_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Digest Algorithm");?></td>
+                  <td>
+                    <select name='digest_alg_sign_csr' id='digest_alg_sign_csr'>
+  <?php
+                    foreach ($openssl_digest_algs as $digest_alg) :?>
+                      <option value="<?=$digest_alg;?>" <?=$pconfig['digest_alg_sign_csr'] == $digest_alg ? 'selected="selected"' : '';?>>
+                        <?=strtoupper($digest_alg);?>
+                      </option>
+  <?php
+                    endforeach; ?>
+                    </select>
+                    <div class="hidden" data-for="help_for_digest_alg_sign_csr">
+                      <?= gettext("NOTE: It is recommended to use an algorithm stronger than SHA1 when possible.") ?>
                     </div>
                   </td>
                 </tr>
@@ -1342,6 +1425,10 @@ $( document ).ready(function() {
                   <b><?=gettext('Revoked') ?></b><br />
 <?php
                 endif;
+                if (!isset($cert['prv'])) :?>
+                  <b><?=gettext('No private key here') ?></b><br />
+<?php
+                endif;
                 if (is_webgui_cert($cert['refid'])) :?>
                   <?=gettext('Web GUI') ?><br />
 <?php
@@ -1371,6 +1458,7 @@ $( document ).ready(function() {
                       <i class="fa fa-download fa-fw"></i>
                   </a>
 
+<?php if (isset($cert['prv'])) :?>
                   <a href="system_certmanager.php?act=key&amp;id=<?=$i;?>" class="btn btn-default btn-xs" data-toggle="tooltip" title="<?=gettext("export user key");?>">
                     <i class="fa fa-download fa-fw"></i>
                   </a>
@@ -1378,6 +1466,8 @@ $( document ).ready(function() {
                   <a data-id="<?=$i;?>"  class="btn btn-default btn-xs p12btn" data-toggle="tooltip" title="<?=gettext("export ca+user cert+user key in .p12 format");?>">
                       <i class="fa fa-download fa-fw"></i>
                   </a>
+<?php
+                endif; ?>
 <?php
                   if (!cert_in_use($cert['refid'])) :?>
 
