@@ -93,7 +93,7 @@ $cert_methods = array(
 );
 $cert_keylens = array( "512", "1024", "2048", "3072", "4096", "8192");
 $openssl_digest_algs = array("sha1", "sha224", "sha256", "sha384", "sha512");
-
+$cert_types = array('usr_cert', 'server_cert', 'combined_server_client', 'v3_ca');
 
 // config reference pointers
 $a_user = &config_read_array('system', 'user');
@@ -132,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $pconfig['lifetime'] = "365";
         $pconfig['lifetime_sign_csr'] = "365";
         $pconfig['cert_type'] = "usr_cert";
+        $pconfig['cert_type_sign_csr'] = "usr_cert";
         $pconfig['cert'] = null;
         $pconfig['key'] = null;
         $pconfig['dn_country'] = null;
@@ -334,8 +335,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $reqdfields = array("certref");
             $reqdfieldsn = array(gettext("Existing Certificate Choice"));
         } elseif ($pconfig['certmethod'] == 'sign_cert_csr') {
-            $reqdfields = array("caref_sign_csr", "csr", "lifetime_sign_csr", "digest_alg_sign_csr");
-            $reqdfieldsn = array(gettext("Certificate authority"), gettext("CSR file"), gettext("Lifetime"), gettext("Digest Algorithm"));
+            $reqdfields = array('caref_sign_csr', 'csr', 'lifetime_sign_csr', 'digest_alg_sign_csr', 'cert_type_sign_csr');
+            $reqdfieldsn = array(gettext("Certificate authority"), gettext("CSR file"), gettext("Lifetime"), gettext("Digest Algorithm"), gettext("Type"));
         }
 
         $altnames = array();
@@ -397,6 +398,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
             }
 
+            if ($pconfig['certmethod'] == "internal" && !in_array($pconfig["cert_type"], $cert_types)) {
+                $input_errors[] = gettext("Please select a valid Type.");
+            }
+
             if ($pconfig['certmethod'] != "external" && isset($pconfig["keylen"]) && !in_array($pconfig["keylen"], $cert_keylens)) {
                 $input_errors[] = gettext("Please select a valid Key Length.");
             }
@@ -412,6 +417,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             if ($pconfig['certmethod'] == "sign_cert_csr" && !in_array($pconfig["digest_alg_sign_csr"], $openssl_digest_algs)) {
                 $input_errors[] = gettext("Please select a valid Digest Algorithm.");
+            }
+            if ($pconfig['certmethod'] == "sign_cert_csr" && !in_array($pconfig["cert_type_sign_csr"], $cert_types)) {
+                $input_errors[] = gettext("Please select a valid Type.");
             }
         }
 
@@ -470,7 +478,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
 
                 if ($pconfig['certmethod'] === 'sign_cert_csr') {
-                    if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'], $pconfig['digest_alg_sign_csr'])) {
+                    if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
+                                       $pconfig['digest_alg_sign_csr'], $pconfig['cert_type_sign_csr'])) {
                         $input_errors = array();
                         while ($ssl_err = openssl_error_string()) {
                             $input_errors[] = gettext("openssl library returns:") . " " . $ssl_err;
@@ -861,6 +870,20 @@ $( document ).ready(function() {
                 </tr>
               </thead>
               <tbody>
+                <tr>
+                  <td><a id="help_for_cert_type_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Type");?> </td>
+                  <td>
+                      <select name="cert_type_sign_csr">
+                          <option value="usr_cert" <?=$pconfig['cert_type_sign_csr'] == 'usr_cert' ? 'selected="selected"' : '';?>> <?=gettext("Client Certificate");?> </option>
+                          <option value="server_cert" <?=$pconfig['cert_type_sign_csr'] == 'server_cert' ? 'selected="selected"' : '';?>> <?=gettext("Server Certificate");?> </option>
+                          <option value="combined_server_client" <?=$pconfig['cert_type_sign_csr'] == 'combined_server_client' ? 'selected="selected"' : '';?>> <?=gettext("Combined Client/Server Certificate");?> </option>
+                          <option value="v3_ca" <?=$pconfig['cert_type_sign_csr'] == 'v3_ca' ? 'selected="selected"' : '';?>> <?=gettext("Certificate Authority");?> </option>
+                      </select>
+                      <div class="hidden" data-for="help_for_cert_type_sign_csr">
+                        <?=gettext("Choose the type of certificate to generate here, the type defines it's constraints");?>
+                      </div>
+                  </td>
+                </tr>
                 <tr>
                   <td style="width:22%"><?=gettext("Certificate authority");?></td>
                   <td style="width:78%">
