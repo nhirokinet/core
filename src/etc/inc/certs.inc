@@ -286,10 +286,8 @@ function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_exten
     $ca_serial = ++$ca['serial'];
 
     $args = array(
-        'private_key_type' => OPENSSL_KEYTYPE_RSA,
         'x509_extensions' => $x509_extensions,
         'digest_alg' => $digest_alg,
-        'encrypt_key' => false
     );
 
     // self sign the certificate
