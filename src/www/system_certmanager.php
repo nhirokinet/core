@@ -880,10 +880,10 @@ $( document ).ready(function() {
                   </td>
                 </tr>
                 <tr>
-                  <td style="width:22%"><a id="help_for_csr_sign" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
+                  <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
                   <td style="width:78%">
                     <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea>
-                    <div class="hidden" data-for="help_for_csr">
+                    <div class="hidden" data-for="help_for_csr_sign_csr">
                       <?=gettext("Paste the CSR file here.");?>
                     </div>
                   </td>
