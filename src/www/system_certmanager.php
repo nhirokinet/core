@@ -89,7 +89,7 @@ $cert_methods = array(
     "import" => gettext("Import an existing Certificate"),
     "internal" => gettext("Create an internal Certificate"),
     "external" => gettext("Create a Certificate Signing Request"),
-    "sign_cert_for_csr" => gettext("Sign for a Certificate Signing Request"),
+    "sign_cert_csr" => gettext("Sign a Certificate Signing Request"),
 );
 $cert_keylens = array( "512", "1024", "2048", "3072", "4096", "8192");
 $openssl_digest_algs = array("sha1", "sha224", "sha256", "sha384", "sha512");
@@ -333,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         } elseif ($pconfig['certmethod'] == "existing") {
             $reqdfields = array("certref");
             $reqdfieldsn = array(gettext("Existing Certificate Choice"));
-        } elseif ($pconfig['certmethod'] == 'sign_cert_for_csr') {
+        } elseif ($pconfig['certmethod'] == 'sign_cert_csr') {
             $reqdfields = array("caref_sign_csr", "csr", "lifetime_sign_csr", "digest_alg_sign_csr");
             $reqdfieldsn = array(gettext("Certificate authority"), gettext("CSR file"), gettext("Lifetime"), gettext("Digest Algorithm"));
         }
@@ -469,8 +469,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     }
                 }
 
-                if ($pconfig['certmethod'] === 'sign_cert_for_csr') {
-                    if (!sign_cert_for_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'], $pconfig['digest_alg_sign_csr'])) {
+                if ($pconfig['certmethod'] === 'sign_cert_csr') {
+                    if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'], $pconfig['digest_alg_sign_csr'])) {
                         $input_errors = array();
                         while ($ssl_err = openssl_error_string()) {
                             $input_errors[] = gettext("openssl library returns:") . " " . $ssl_err;
@@ -700,7 +700,7 @@ if (empty($act)) {
             $("#internal").addClass("hidden");
             $("#external").addClass("hidden");
             $("#existing").addClass("hidden");
-            $("#sign_cert_for_csr").addClass("hidden");
+            $("#sign_cert_csr").addClass("hidden");
             if ($(this).val() == "import") {
                 $("#import").removeClass("hidden");
             } else if ($(this).val() == "internal") {
@@ -709,8 +709,8 @@ if (empty($act)) {
             } else if ($(this).val() == "external") {
                 $("#external").removeClass("hidden");
                 $("#altNameTr").detach().appendTo("#external > tbody:first");
-            } else if ($(this).val() == "sign_cert_for_csr") {
-                $("#sign_cert_for_csr").removeClass("hidden");
+            } else if ($(this).val() == "sign_cert_csr") {
+                $("#sign_cert_csr").removeClass("hidden");
             } else {
                 $("#existing").removeClass("hidden");
             }
@@ -853,8 +853,8 @@ $( document ).ready(function() {
                 </tr>
               </tbody>
             </table>
-            <!-- sign_cert_for_csr -->
-            <table id="sign_cert_for_csr" class="table table-striped opnsense_standard_table_form">
+            <!-- sign_cert_csr -->
+            <table id="sign_cert_csr" class="table table-striped opnsense_standard_table_form">
               <thead>
                 <tr>
                   <th colspan="2"><?=gettext("Sign CSR");?></th>

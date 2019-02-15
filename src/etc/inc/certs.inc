@@ -269,7 +269,7 @@ function cert_create(&$cert, $caref, $keylen, $lifetime, $dn, $digest_alg = 'sha
     return true;
 }
 
-function sign_cert_for_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_extensions = 'usr_cert')
+function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_extensions = 'usr_cert')
 {
     $ca = &lookup_ca($caref);
     if (!$ca) {
