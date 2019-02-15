@@ -410,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             if ($pconfig['certmethod'] == "external" && !in_array($pconfig["csr_digest_alg"], $openssl_digest_algs)) {
                 $input_errors[] = gettext("Please select a valid Digest Algorithm.");
             }
-            if ($pconfig['certmethod'] == "sign_csr_for_crt" && !in_array($pconfig["digest_alg_sign_csr"], $openssl_digest_algs)) {
+            if ($pconfig['certmethod'] == "sign_cert_csr" && !in_array($pconfig["digest_alg_sign_csr"], $openssl_digest_algs)) {
                 $input_errors[] = gettext("Please select a valid Digest Algorithm.");
             }
         }
