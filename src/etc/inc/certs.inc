@@ -40,8 +40,6 @@ $openssl_crl_status = array(
   OCSP_REVOKED_STATUS_CERTIFICATEHOLD       => "Certificate Hold"
 );
 
-$openssl_config_template_file_name = '/usr/local/etc/ssl/opnsense.cnf';
-
 function &lookup_ca($refid)
 {
     global $config;
@@ -149,7 +147,7 @@ function ca_chain(&$cert)
 function ca_create(&$ca, $keylen, $lifetime, $dn, $digest_alg = 'sha256')
 {
     $args = array(
-        'config' => $openssl_config_template_file_name,
+        'config' => '/usr/local/etc/ssl/opnsense.cnf',
         'private_key_type' => OPENSSL_KEYTYPE_RSA,
         'private_key_bits' => (int)$keylen,
         'x509_extensions' => 'v3_ca',
@@ -288,7 +286,7 @@ function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_exten
     $ca_serial = ++$ca['serial'];
 
     $args = array(
-        'config' => $openssl_config_template_file_name,
+        'config' => '/usr/local/etc/ssl/opnsense.cnf',
         'x509_extensions' => $x509_extensions,
         'digest_alg' => $digest_alg,
     );
@@ -721,7 +719,7 @@ function create_temp_openssl_config(&$dn)
     // define temp filename to use for openssl.cnf
     $configFilename = tempnam(sys_get_temp_dir(), 'ssl');
 
-    $template = file_get_contents($openssl_config_template_file_name);
+    $template = file_get_contents('/usr/local/etc/ssl/opnsense.cnf');
 
     foreach (['subjectAltName'] as $dnTag) {
         if (isset($dn[$dnTag])) {
