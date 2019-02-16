@@ -133,7 +133,7 @@ function parse_csr($csr)
                             continue;
                         }
                         if ($extension instanceof \X509\Certificate\Extension\BasicConstraintsExtension) {
-                            $ret['basicConstraints'] = 'CA:' . ($extension->isCA() ? 'TRUE' : 'FALSE');
+                            $ret['basicConstraints'] = 'CA:' . ($extension->isCA() ? 'TRUE' : 'FALSE'); // TODO: this is bad idea: better array when introducing actual UI
                             continue;
                         }
 
