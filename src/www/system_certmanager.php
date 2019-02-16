@@ -198,6 +198,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
           }
       }
       exit;
+    } elseif ($act == 'csr_info') {
+      if (!isset($_GET['csr'])) {
+        http_response_code(400);
+        echo gettext('Invalid request');
+        exit;
+      }
+
+      // use openssl to dump csr in readable format
+      $process = proc_open('/usr/local/bin/openssl req -text -noout', array(array("pipe", "r"), array("pipe", "w"), array("pipe", "w")), $pipes);
+      if (is_resource($process)) {
+        fwrite($pipes[0], $_GET['csr']);
+        fclose($pipes[0]);
+
+        $result_stdin = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+
+        $result_stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+
+        proc_close($process);
+
+        echo $result_stdin;
+        echo $result_stderr;
+      }
+      exit;
     }
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -672,6 +697,25 @@ if (empty($act)) {
 
     });
 
+    $(".csr_info_for_sign_csr").click(function(event){
+        event.preventDefault();
+        var csr_payload = $('#csr').val();
+        $.ajax({
+                url:"system_certmanager.php",
+                type: 'get',
+                data: {'act' : 'csr_info', 'csr' : csr_payload},
+                success: function(data){
+                  BootstrapDialog.show({
+                              title: '<?=gettext("Certificate Request");?>',
+                              type:BootstrapDialog.TYPE_INFO,
+                              message: $("<div/>").text(data).html(),
+                              cssClass: 'monospace-dialog',
+                          });
+                }
+        });
+
+    });
+
     /**
      * remove row from altNametable
      */
@@ -906,6 +950,7 @@ $( document ).ready(function() {
                   <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
                   <td style="width:78%">
                     <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea>
+                    <a href="#" class="csr_info_for_sign_csr">Display CSR Content (TODO: better style button)</a>
                     <div class="hidden" data-for="help_for_csr_sign_csr">
                       <?=gettext("Paste the CSR file here.");?>
                     </div>
