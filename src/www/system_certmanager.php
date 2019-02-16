@@ -86,11 +86,15 @@ function csr_get_modulus($str_crt, $decode = true)
 
 function parse_csr($csr)
 {
-    // TODO: very bad implemented and should be rewritten (just for testing now)
+    // TODO: very bad implementation and should be rewritten before merging (just for testing now)
     // TODO: implement other extensions
 
     $ret = array();
-    $ret['parse_success']  = true;
+    $ret['parse_success'] = true;
+    $ret['subject'] = openssl_csr_get_subject($csr);
+    if ($ret['subject'] === false) {
+        return array('parse_success' => false);
+    }
 
     $process = proc_open('/usr/local/bin/openssl req -text -noout | grep "X509v3 Subject Alternative Name:" -A 1 | tail -n 1 | sed -e "s/^ *//g"', array(array("pipe", "r"), array("pipe", "w"), array("pipe", "w")), $pipes);
     if (is_resource($process)) {
@@ -256,7 +260,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
       if (!isset($_GET['csr'])) {
         http_response_code(400);
-        echo '{"error": "Invalid request"}';
+        // TODO: use gettext() and proper HTML/javascript escape in whole system (or maybe no worry of special character for texts from gettext()?)
+        echo json_encode(array('error' => 'Invalid Request', 'error_detail' => 'No csr parameter in query'));
         exit;
       }
 
@@ -264,7 +269,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
       if ($parsed_result['parse_success'] !== true) {
         http_response_code(400);
-        echo '{"error": "Invalid CSR"}';
+        // TODO: use gettext() and proper HTML/javascript escape in whole system (or maybe no worry of special character for texts from gettext()?)
+        echo json_encode(array('error' => 'CSR file is invalid', 'error_detail' => 'Could not parse CSR file.'));
         exit;
       }
 
@@ -776,13 +782,48 @@ if (empty($act)) {
                 type: 'get',
                 data: {'act' : 'csr_info_json', 'csr' : csr_payload},
                 success: function(data){
+                        subject_text = '';
+                        Object.keys(data.subject).forEach(function(item) {
+                                if (subject_text != '') {
+                                        subject_text += ', ';
+                                }
+                                subject_text += item + '=' + data.subject[item];
+                        });
+
                         $('#next_button_for_x509_extension_step_sign_csr').addClass('hidden');
                         $('#csr').prop('readonly', true);
                         $('#x509_extension_step_sign_cert_csr').removeClass('hidden');
+                        $('#subject_sign_csr').text(subject_text);
                         $('#subject_alt_name_sign_csr').val(data.subjectAltName);
                         $('#submit').removeClass('hidden');
-                }
-                // TODO: error handling (Especially for invalid CSR error)
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                        if (jqXHR.status == 400) {
+                                BootstrapDialog.show({
+                                        type:BootstrapDialog.TYPE_DANGER,
+                                        title: jqXHR.responseJSON.error,
+                                        message: jqXHR.responseJSON.error_detail,
+                                        buttons: [
+                                            {
+                                                label: "<?=gettext("OK");?>",
+                                                action: function(dialogRef) { dialogRef.close(); }
+                                            }
+                                       ]
+                                });
+                                return;
+                        }
+                        BootstrapDialog.show({
+                                type:BootstrapDialog.TYPE_DANGER,
+                                title: "<?= gettext("Unknown Error");?>",
+                                message: "<?= gettext("Unknown error occured. Try again.");?>",
+                                buttons: [
+                                    {
+                                        label: "<?=gettext("OK");?>",
+                                        action: function(dialogRef) { dialogRef.close(); }
+                                    }
+                               ]
+                        });
+                },
         });
     });
 
@@ -1076,6 +1117,11 @@ $( document ).ready(function() {
                     <div class="hidden" data-for="help_for_csr_file_view">
                       <?=gettext('X509 extensions are ignored (TODO: better English message; available ones already copied)')?>
                     </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('Subject');?></td>
+                  <td style="width:78%" id="subject_sign_csr">
                   </td>
                 </tr>
                 <tr>
