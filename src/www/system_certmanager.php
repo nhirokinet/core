@@ -134,6 +134,10 @@ function parse_csr($csr)
                         }
                         if ($extension instanceof \X509\Certificate\Extension\BasicConstraintsExtension) {
                             $ret['basicConstraints'] = 'CA:' . ($extension->isCA() ? 'TRUE' : 'FALSE'); // TODO: this is bad idea: better array when introducing actual UI
+                            if ($extension->hasPathLen()) { 
+                                $ret['basicConstraints'] .= ', pathlen:' . $extension->pathLen(); // TODO: this is bad idea: better array when introducing actual UI
+                            }
+                            // other options of basicConstraints is not supported by sop/x509 as of 17/Feb/2019.
                             continue;
                         }
 
