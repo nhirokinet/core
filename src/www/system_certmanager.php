@@ -123,15 +123,54 @@ function parse_csr($csr)
                             }
                         }
                         if ($extension instanceof \X509\Certificate\Extension\KeyUsageExtension) {
-                            // TODO
-                            //var_dump($extension);
+                            $keyusages = array();
+                            // TODO: check all of them are correct in openssl.cnf, and has no typos
+                            if ($extension->isDigitalSignature()) {
+                                array_push($keyusages, 'digitalSignature');
+                            }
+                            if ($extension->isNonRepudiation()) {
+                                array_push($keyusages, 'nonRepudiation');
+                            }
+                            if ($extension->isKeyEncipherment()) {
+                                array_push($keyusages, 'keyEncipherment');
+                            }
+                            if ($extension->isDataEncipherment()) {
+                                array_push($keyusages, 'dataEncipherment');
+                            }
+                            if ($extension->isKeyAgreement()) {
+                                array_push($keyusages, 'keyAgreement');
+                            }
+                            if ($extension->isKeyCertSign()) {
+                                array_push($keyusages, 'keyCertSign');
+                            }
+                            if ($extension->isCRLSign()) {
+                                array_push($keyusages, 'cslSign');
+                            }
+                            if ($extension->isEncipherOnly()) {
+                                array_push($keyusages, 'enCipherOnly');
+                            }
+
+                            $ret['keyUsage'] = join(',', $keyusages); // TODO: this is bad idea: better array when introducing actual UI
+
+                            // other options of basicConstraints is not supported by sop/x509 as of 17/Feb/2019.
                             continue;
                         }
+
                         if ($extension instanceof \X509\Certificate\Extension\ExtendedKeyUsageExtension) {
-                            // TODO
-                            //var_dump($extension);
+                            $keyusages = array();
+                            if ($extension->has(\X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_SERVER_AUTH)) {
+                                array_push($keyusages, \X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_SERVER_AUTH);
+                            }
+                            if ($extension->has(\X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_CLIENT_AUTH)) {
+                                array_push($keyusages, \X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_CLIENT_AUTH);
+                            }
+                            // TODO: add all here https://github.com/sop/x509/blob/master/lib/X509/Certificate/Extension/ExtendedKeyUsageExtension.php
+
+                            $ret['extendedKeyUsage'] = join(',', $keyusages); // TODO: this is bad idea: better array when introducing actual UI
+
                             continue;
                         }
+
                         if ($extension instanceof \X509\Certificate\Extension\BasicConstraintsExtension) {
                             $ret['basicConstraints'] = 'CA:' . ($extension->isCA() ? 'TRUE' : 'FALSE'); // TODO: this is bad idea: better array when introducing actual UI
                             if ($extension->hasPathLen()) { 
@@ -590,13 +629,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
                 if ($pconfig['certmethod'] === 'sign_cert_csr') {
                     $dn = array();
-                    // TODO: add other extensions
                     if (isset($pconfig['subject_alt_name_sign_csr']) && $pconfig['subject_alt_name_sign_csr'] !== '') {
+                        // TODO: this code has security issue
                         $dn['subjectAltName'] = $pconfig['subject_alt_name_sign_csr'];
                     }
                     if (isset($pconfig['basic_constraints_sign_csr']) && $pconfig['basic_constraints_sign_csr'] !== '') {
                         // TODO: this code has security issue
                         $dn['basicConstraints'] = $pconfig['basic_constraints_sign_csr'];
+                    }
+                    if (isset($pconfig['key_usage_sign_csr']) && $pconfig['key_usage_sign_csr'] !== '') {
+                        // TODO: this code has security issue
+                        $dn['keyUsage'] = $pconfig['key_usage_sign_csr'];
+                    }
+                    if (isset($pconfig['extended_key_usage_sign_csr']) && $pconfig['extended_key_usage_sign_csr'] !== '') {
+                        // TODO: this code has security issue
+                        $dn['extendedKeyUsage'] = $pconfig['extended_key_usage_sign_csr'];
                     }
                     if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
                                        $pconfig['digest_alg_sign_csr'], $dn)) {
@@ -832,6 +879,8 @@ if (empty($act)) {
                         $('#subject_sign_csr').text(subject_text);
                         $('#subject_alt_name_sign_csr').val(data.subjectAltName);
                         $('#basic_constraints_sign_csr').val(data.basicConstraints);
+                        $('#key_usage_sign_csr').val(data.keyUsage);
+                        $('#extended_key_usage_sign_csr').val(data.extendedKeyUsage);
                         $('#submit').removeClass('hidden');
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
@@ -1153,6 +1202,20 @@ $( document ).ready(function() {
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('basicConstraints');?></td>
                     <td style="width:78%">
                       <input name="basic_constraints_sign_csr" type="text" id="basic_constraints_sign_csr" size="5" value="<?=$pconfig['basic_constraints_sign_csr'];?>"/>
+                    </td>
+                  </tr>
+                  <tr>
+                    <!-- TODO: validation, better UI -->
+                    <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('keyUsage');?></td>
+                    <td style="width:78%">
+                      <input name="key_usage_sign_csr" type="text" id="key_usage_sign_csr" size="5" value="<?=$pconfig['key_usage_sign_csr'];?>"/>
+                    </td>
+                  </tr>
+                  <tr>
+                    <!-- TODO: validation, better UI -->
+                    <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('extendedKeyUsage');?></td>
+                    <td style="width:78%">
+                      <input name="extended_key_usage_sign_csr" type="text" id="extended_key_usage_sign_csr" size="5" value="<?=$pconfig['extended_key_usage_sign_csr'];?>"/>
                     </td>
                   </tr>
                   <!-- TODO: Some other extension values -->
