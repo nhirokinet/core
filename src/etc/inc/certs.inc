@@ -291,7 +291,6 @@ function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_exten
         'digest_alg' => $digest_alg,
     );
 
-    // TODO: According to PHP document, openssl_csr_sign() accepts CSR created by openssl_csr_new(), therefore it cannot be used to sign arbitrary CSR.
     // TODO: Obtained CSR has no SAN
 
     $res_crt = openssl_csr_sign($csr, $ca_res_crt, $ca_res_key, $lifetime, $args, $ca_serial);
