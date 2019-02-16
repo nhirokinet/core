@@ -200,7 +200,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $pconfig['lifetime'] = "365";
         $pconfig['lifetime_sign_csr'] = "365";
         $pconfig['cert_type'] = "usr_cert";
-        $pconfig['cert_type_sign_csr'] = "usr_cert";
         $pconfig['cert'] = null;
         $pconfig['key'] = null;
         $pconfig['dn_country'] = null;
@@ -449,8 +448,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $reqdfields = array("certref");
             $reqdfieldsn = array(gettext("Existing Certificate Choice"));
         } elseif ($pconfig['certmethod'] == 'sign_cert_csr') {
-            $reqdfields = array('caref_sign_csr', 'csr', 'lifetime_sign_csr', 'digest_alg_sign_csr', 'cert_type_sign_csr');
-            $reqdfieldsn = array(gettext("Certificate authority"), gettext("CSR file"), gettext("Lifetime"), gettext("Digest Algorithm"), gettext("Type"));
+            $reqdfields = array('caref_sign_csr', 'csr', 'lifetime_sign_csr', 'digest_alg_sign_csr');
+            $reqdfieldsn = array(gettext("Certificate authority"), gettext("CSR file"), gettext("Lifetime"), gettext("Digest Algorithm"));
         }
 
         $altnames = array();
@@ -532,9 +531,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             if ($pconfig['certmethod'] == "sign_cert_csr" && !in_array($pconfig["digest_alg_sign_csr"], $openssl_digest_algs)) {
                 $input_errors[] = gettext("Please select a valid Digest Algorithm.");
-            }
-            if ($pconfig['certmethod'] == "sign_cert_csr" && !in_array($pconfig["cert_type_sign_csr"], $cert_types)) {
-                $input_errors[] = gettext("Please select a valid Type.");
             }
         }
 
@@ -1073,20 +1069,6 @@ $( document ).ready(function() {
               </thead>
               <tbody>
                 <tr>
-                  <td><a id="help_for_cert_type_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Type TODO: remove it (some x509 extensions will do the job)");?> </td>
-                  <td>
-                      <select name="cert_type_sign_csr">
-                          <option value="usr_cert" <?=$pconfig['cert_type_sign_csr'] == 'usr_cert' ? 'selected="selected"' : '';?>> <?=gettext("Client Certificate");?> </option>
-                          <option value="server_cert" <?=$pconfig['cert_type_sign_csr'] == 'server_cert' ? 'selected="selected"' : '';?>> <?=gettext("Server Certificate");?> </option>
-                          <option value="combined_server_client" <?=$pconfig['cert_type_sign_csr'] == 'combined_server_client' ? 'selected="selected"' : '';?>> <?=gettext("Combined Client/Server Certificate");?> </option>
-                          <option value="v3_ca" <?=$pconfig['cert_type_sign_csr'] == 'v3_ca' ? 'selected="selected"' : '';?>> <?=gettext("Certificate Authority");?> </option>
-                      </select>
-                      <div class="hidden" data-for="help_for_cert_type_sign_csr">
-                        <?=gettext("Choose the type of certificate to generate here, the type defines it's constraints");?>
-                      </div>
-                  </td>
-                </tr>
-                <tr>
                   <td style="width:22%"><?=gettext("Certificate authority");?></td>
                   <td style="width:78%">
                     <select name='caref_sign_csr' id='caref_sign_csr'>
@@ -1130,7 +1112,9 @@ $( document ).ready(function() {
                 <tr>
                   <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
                   <td style="width:78%">
-                    <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea>
+                    <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea><br/>
+                    <!-- TODO: nice message that indicates x509 extensions are ignored unless copied to below, rather result is (here.publickey + below new table). -->
+                    <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
                     <div class="hidden" data-for="help_for_csr_sign_csr">
                       <?=gettext("Paste the CSR file here.");?>
                     </div>
@@ -1152,15 +1136,6 @@ $( document ).ready(function() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td style="width:22%"><a id="help_for_csr_file_view" href="#" class="showhelp"><i class="fa fa-info-circle"></i> </a><?=gettext('Certificate Signing Request File');?></td>
-                    <td style="width:78%">
-                      <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
-                      <div class="hidden" data-for="help_for_csr_file_view">
-                        <?=gettext('X509 extensions are ignored (TODO: better English message; available ones already copied)')?>
-                      </div>
-                    </td>
-                  </tr>
                   <tr>
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('Subject');?></td>
                     <td style="width:78%" id="subject_sign_csr">
