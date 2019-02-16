@@ -1162,7 +1162,7 @@ $( document ).ready(function() {
                   <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
                   <td style="width:78%">
                     <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea><br/>
-                    <!-- TODO: nice message that indicates x509 extensions are ignored unless copied to below, rather result is (here.publickey + below new table). -->
+                    <!-- TODO: nice English message that indicates x509 extensions are ignored unless copied to below, rather result is (here.publickey + below new table). -->
                     <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
                     <div class="hidden" data-for="help_for_csr_sign_csr">
                       <?=gettext("Paste the CSR file here.");?>
