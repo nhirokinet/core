@@ -29,6 +29,7 @@
 
 require_once('guiconfig.inc');
 require_once("system.inc");
+require_once('x509/vendor/autoload.php');
 
 function csr_generate(&$cert, $keylen, $dn, $digest_alg = 'sha256')
 {
@@ -86,9 +87,6 @@ function csr_get_modulus($str_crt, $decode = true)
 
 function parse_csr($csr)
 {
-    // TODO: very bad implementation and should be rewritten before merging (just for testing now)
-    // TODO: implement other extensions
-
     $ret = array();
     $ret['parse_success'] = true;
     $ret['subject'] = openssl_csr_get_subject($csr);
@@ -96,23 +94,40 @@ function parse_csr($csr)
         return array('parse_success' => false);
     }
 
-    $process = proc_open('/usr/local/bin/openssl req -text -noout | grep "X509v3 Subject Alternative Name:" -A 1 | tail -n 1 | sed -e "s/^ *//g"', array(array("pipe", "r"), array("pipe", "w"), array("pipe", "w")), $pipes);
-    if (is_resource($process)) {
-        fwrite($pipes[0], $_GET['csr']);
-        fclose($pipes[0]);
+    $csr_obj = \X509\CertificationRequest\CertificationRequest::fromPEM(Sop\CryptoEncoding\PEM::fromString($csr));
 
-        $result_stdout = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
+    $csr_attrs = $csr_obj->certificationRequestInfo()->attributes();
 
-        $result_stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-
-        proc_close($process);
-
-        if ($result_stdout != '') {
-            $ret['subjectAltName'] = $result_stdout;
+    $san_str = ''; // TODO: this is bad idea: better array when introducing actual UI
+    foreach ($csr_attrs as $attr) {
+        if ($attr instanceof \X501\ASN1\Attribute) {
+            foreach ($attr->values() as $value) {
+                if ($value instanceof \X509\CertificationRequest\Attribute\ExtensionRequestValue) {
+                    foreach ($value->extensions() as $extension) {
+                        if ($extension instanceof \X509\Certificate\Extension\SubjectAlternativeNameExtension) {
+                            foreach ($extension->names() as $name) {
+                                if ($name instanceof \X509\GeneralName\DNSName) {
+                                    if ($san_str !== '') {$san_str .= ' ';}
+                                    $san_str .= 'DNS:' . $name->name(); // TODO: this is bad idea: better array when introducing actual UI
+                                    continue;
+                                }
+                                if ($name instanceof \X509\GeneralName\IPAddress) {
+                                    // v4 or v6 does not matter here
+                                    if ($san_str !== '') {$san_str .= ' ';}
+                                    $san_str .= 'IP:' . $name->address(); // TODO: this is bad idea: better array when introducing actual UI
+                                    continue;
+                                }
+                                // TODO: add other name types (email, uri)
+                            }
+                        }
+                        // TODO: add other extension types (keyusage, extendedkeyusage, ca flag)
+                    }
+                }
+            }
         }
     }
+    $ret['subjectAltName'] = $san_str;
+
     return $ret;
 }
 
