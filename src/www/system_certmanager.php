@@ -1144,44 +1144,46 @@ $( document ).ready(function() {
                 </tr>
               </tbody>
             </table>
-            <table id="x509_extension_step_sign_cert_csr" class="table table-striped opnsense_standard_table_form hidden">
-              <thead>
-                <tr>
-                  <th colspan="2"><?=gettext("Confirm and modify option");?></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="width:22%"><a id="help_for_csr_file_view" href="#" class="showhelp"><i class="fa fa-info-circle"></i> </a><?=gettext('Certificate Signing Request File');?></td>
-                  <td style="width:78%">
-                    <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
-                    <div class="hidden" data-for="help_for_csr_file_view">
-                      <?=gettext('X509 extensions are ignored (TODO: better English message; available ones already copied)')?>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('Subject');?></td>
-                  <td style="width:78%" id="subject_sign_csr">
-                  </td>
-                </tr>
-                <tr>
-                  <!-- TODO: validation, better UI -->
-                  <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('subjectAltName');?></td>
-                  <td style="width:78%">
-                    <input name="subject_alt_name_sign_csr" type="text" id="subject_alt_name_sign_csr" size="5" value="<?=$pconfig['subject_alt_name_sign_csr'];?>"/>
-                  </td>
-                </tr>
-                <tr>
-                  <!-- TODO: validation, better UI -->
-                  <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('basicConstraints');?></td>
-                  <td style="width:78%">
-                    <input name="basic_constraints_sign_csr" type="text" id="basic_constraints_sign_csr" size="5" value="<?=$pconfig['basic_constraints_sign_csr'];?>"/>
-                  </td>
-                </tr>
-                <!-- TODO: Some other extension values -->
-              </tbody>
-            </table>
+            <div id="x509_extension_step_sign_cert_csr" class="hidden">
+              <table class="table table-striped opnsense_standard_table_form">
+                <thead>
+                  <tr>
+                    <th colspan="2"><?=gettext("Confirm and modify option (TODO: better English Message)");?></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="width:22%"><a id="help_for_csr_file_view" href="#" class="showhelp"><i class="fa fa-info-circle"></i> </a><?=gettext('Certificate Signing Request File');?></td>
+                    <td style="width:78%">
+                      <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
+                      <div class="hidden" data-for="help_for_csr_file_view">
+                        <?=gettext('X509 extensions are ignored (TODO: better English message; available ones already copied)')?>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('Subject');?></td>
+                    <td style="width:78%" id="subject_sign_csr">
+                    </td>
+                  </tr>
+                  <tr>
+                    <!-- TODO: validation, better UI -->
+                    <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('subjectAltName');?></td>
+                    <td style="width:78%">
+                      <input name="subject_alt_name_sign_csr" type="text" id="subject_alt_name_sign_csr" size="5" value="<?=$pconfig['subject_alt_name_sign_csr'];?>"/>
+                    </td>
+                  </tr>
+                  <tr>
+                    <!-- TODO: validation, better UI -->
+                    <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('basicConstraints');?></td>
+                    <td style="width:78%">
+                      <input name="basic_constraints_sign_csr" type="text" id="basic_constraints_sign_csr" size="5" value="<?=$pconfig['basic_constraints_sign_csr'];?>"/>
+                    </td>
+                  </tr>
+                  <!-- TODO: Some other extension values -->
+                </tbody>
+              </table>
+            </div>
             <!-- internal cert -->
             <table id="internal" class="table table-striped opnsense_standard_table_form">
               <thead>
