@@ -269,7 +269,7 @@ function cert_create(&$cert, $caref, $keylen, $lifetime, $dn, $digest_alg = 'sha
     return true;
 }
 
-function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_extensions = 'usr_cert')
+function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $dn)
 {
     $ca = &lookup_ca($caref);
     if (!$ca) {
@@ -285,13 +285,14 @@ function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_exten
     }
     $ca_serial = ++$ca['serial'];
 
-    $args = array(
-        'config' => '/usr/local/etc/ssl/opnsense.cnf',
-        'x509_extensions' => $x509_extensions,
-        'digest_alg' => $digest_alg,
-    );
+    // handle parameters which can only be set via the configuration file
+    $config_filename = create_temp_openssl_config($dn);
 
-    // TODO: Obtained CSR has no SAN
+    $args = array(
+        'config' => $config_filename,
+        'digest_alg' => $digest_alg,
+        'x509_extensions' => 'sign_csr',
+    );
 
     $res_crt = openssl_csr_sign($csr, $ca_res_crt, $ca_res_key, $lifetime, $args, $ca_serial);
     if ($res_crt === false) {
@@ -306,6 +307,9 @@ function sign_cert_csr(&$cert, $caref, $csr, $lifetime, $digest_alg, $x509_exten
     // return our certificate information
     $cert['caref'] = $caref;
     $cert['crt'] = base64_encode($str_crt);
+
+    // remove tempfile (template)
+    unlink($config_filename);
 
     return true;
 }
@@ -721,7 +725,7 @@ function create_temp_openssl_config(&$dn)
 
     $template = file_get_contents('/usr/local/etc/ssl/opnsense.cnf');
 
-    foreach (['subjectAltName'] as $dnTag) {
+    foreach (['subjectAltName', 'keyUsage', 'extendedKeyUsage', 'basicConstraints'] as $dnTag) {
         if (isset($dn[$dnTag])) {
             $template_dn = $dnTag . ' = ' . $dn[$dnTag];
             // Overwrite the placeholders for this property

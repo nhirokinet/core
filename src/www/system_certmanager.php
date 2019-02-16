@@ -84,6 +84,34 @@ function csr_get_modulus($str_crt, $decode = true)
     return cert_get_modulus($str_crt, $decode, 'csr');
 }
 
+function parse_csr($csr)
+{
+    // TODO: very bad implemented and should be rewritten (just for testing now)
+    // TODO: implement other extensions
+
+    $ret = array();
+    $ret['parse_success']  = true;
+
+    $process = proc_open('/usr/local/bin/openssl req -text -noout | grep "X509v3 Subject Alternative Name:" -A 1 | tail -n 1 | sed -e "s/^ *//g"', array(array("pipe", "r"), array("pipe", "w"), array("pipe", "w")), $pipes);
+    if (is_resource($process)) {
+        fwrite($pipes[0], $_GET['csr']);
+        fclose($pipes[0]);
+
+        $result_stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+
+        $result_stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+
+        proc_close($process);
+
+        if ($result_stdout != '') {
+            $ret['subjectAltName'] = $result_stdout;
+        }
+    }
+    return $ret;
+}
+
 // types
 $cert_methods = array(
     "import" => gettext("Import an existing Certificate"),
@@ -211,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         fwrite($pipes[0], $_GET['csr']);
         fclose($pipes[0]);
 
-        $result_stdin = stream_get_contents($pipes[1]);
+        $result_stdout = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
 
         $result_stderr = stream_get_contents($pipes[2]);
@@ -219,9 +247,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         proc_close($process);
 
-        echo $result_stdin;
+        echo $result_stdout;
         echo $result_stderr;
       }
+      exit;
+    } elseif ($act == 'csr_info_json') {
+      header("Content-Type: application/json;charset=UTF-8");
+
+      if (!isset($_GET['csr'])) {
+        http_response_code(400);
+        echo '{"error": "Invalid request"}';
+        exit;
+      }
+
+      $parsed_result = parse_csr($_GET['csr']);
+
+      if ($parsed_result['parse_success'] !== true) {
+        http_response_code(400);
+        echo '{"error": "Invalid CSR"}';
+        exit;
+      }
+
+      echo json_encode($parsed_result);
       exit;
     }
 
@@ -375,6 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
 
             /* Input validation for subjectAltNames */
+            // TODO: make it a function and apply to sign_csr
             foreach ($altnames as $altname) {
                 switch ($altname['type']) {
                     case "DNS":
@@ -503,8 +551,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
 
                 if ($pconfig['certmethod'] === 'sign_cert_csr') {
+                    $dn = array();
+                    // TODO: add other extensions
+                    if (isset($pconfig['subject_alt_name_sign_csr']) && $pconfig['subject_alt_name_sign_csr'] !== '') {
+                        $dn['subjectAltName'] = $pconfig['subject_alt_name_sign_csr'];
+                    }
                     if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
-                                       $pconfig['digest_alg_sign_csr'], $pconfig['cert_type_sign_csr'])) {
+                                       $pconfig['digest_alg_sign_csr'], $dn)) {
                         $input_errors = array();
                         while ($ssl_err = openssl_error_string()) {
                             $input_errors[] = gettext("openssl library returns:") . " " . $ssl_err;
@@ -713,7 +766,24 @@ if (empty($act)) {
                           });
                 }
         });
+    });
 
+    $(".x509_extension_step_sign_csr").click(function(event){
+        event.preventDefault();
+        var csr_payload = $('#csr').val();
+        $.ajax({
+                url:"system_certmanager.php",
+                type: 'get',
+                data: {'act' : 'csr_info_json', 'csr' : csr_payload},
+                success: function(data){
+                        $('#next_button_for_x509_extension_step_sign_csr').addClass('hidden');
+                        $('#csr').prop('readonly', true);
+                        $('#x509_extension_step_sign_cert_csr').removeClass('hidden');
+                        $('#subject_alt_name_sign_csr').val(data.subjectAltName);
+                        $('#submit').removeClass('hidden');
+                }
+                // TODO: error handling (Especially for invalid CSR error)
+        });
     });
 
     /**
@@ -749,23 +819,29 @@ if (empty($act)) {
 
 
         $("#certmethod").change(function(){
+            $("#submit").addClass("hidden");
             $("#import").addClass("hidden");
             $("#internal").addClass("hidden");
             $("#external").addClass("hidden");
             $("#existing").addClass("hidden");
             $("#sign_cert_csr").addClass("hidden");
+            $("#x509_extension_sign_cert_csr").addClass("hidden");
             if ($(this).val() == "import") {
                 $("#import").removeClass("hidden");
+                $("#submit").removeClass("hidden");
             } else if ($(this).val() == "internal") {
                 $("#internal").removeClass("hidden");
                 $("#altNameTr").detach().appendTo("#internal > tbody:first");
+                $("#submit").removeClass("hidden");
             } else if ($(this).val() == "external") {
                 $("#external").removeClass("hidden");
                 $("#altNameTr").detach().appendTo("#external > tbody:first");
+                $("#submit").removeClass("hidden");
             } else if ($(this).val() == "sign_cert_csr") {
                 $("#sign_cert_csr").removeClass("hidden");
             } else {
                 $("#existing").removeClass("hidden");
+                $("#submit").removeClass("hidden");
             }
         });
 
@@ -915,7 +991,7 @@ $( document ).ready(function() {
               </thead>
               <tbody>
                 <tr>
-                  <td><a id="help_for_cert_type_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Type");?> </td>
+                  <td><a id="help_for_cert_type_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Type TODO: remove it (some x509 extensions will do the job)");?> </td>
                   <td>
                       <select name="cert_type_sign_csr">
                           <option value="usr_cert" <?=$pconfig['cert_type_sign_csr'] == 'usr_cert' ? 'selected="selected"' : '';?>> <?=gettext("Client Certificate");?> </option>
@@ -947,22 +1023,6 @@ $( document ).ready(function() {
                   </td>
                 </tr>
                 <tr>
-                  <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
-                  <td style="width:78%">
-                    <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea>
-                    <a href="#" class="csr_info_for_sign_csr">Display CSR Content (TODO: better style button)</a>
-                    <div class="hidden" data-for="help_for_csr_sign_csr">
-                      <?=gettext("Paste the CSR file here.");?>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Lifetime");?> (<?=gettext("days");?>)</td>
-                  <td>
-                    <input name="lifetime_sign_csr" type="text" id="lifetime_sign_csr" size="5" value="<?=$pconfig['lifetime_sign_csr'];?>"/>
-                  </td>
-                </tr>
-                <tr>
                   <td><a id="help_for_digest_alg_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("Digest Algorithm");?></td>
                   <td>
                     <select name='digest_alg_sign_csr' id='digest_alg_sign_csr'>
@@ -979,6 +1039,52 @@ $( document ).ready(function() {
                     </div>
                   </td>
                 </tr>
+                <tr>
+                  <td><i class="fa fa-info-circle text-muted"></i> <?=gettext("Lifetime");?> (<?=gettext("days");?>)</td>
+                  <td>
+                    <input name="lifetime_sign_csr" type="text" id="lifetime_sign_csr" size="5" value="<?=$pconfig['lifetime_sign_csr'];?>"/>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
+                  <td style="width:78%">
+                    <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea>
+                    <div class="hidden" data-for="help_for_csr_sign_csr">
+                      <?=gettext("Paste the CSR file here.");?>
+                    </div>
+                  </td>
+                </tr>
+                <tr id="next_button_for_x509_extension_step_sign_csr">
+                  <td style="width:22%">&nbsp;</td>
+                  <td style="width:78%">
+                    <a href="#" class="x509_extension_step_sign_csr btn btn-primary"><?=gettext("Next");?></a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <table id="x509_extension_step_sign_cert_csr" class="table table-striped opnsense_standard_table_form hidden">
+              <thead>
+                <tr>
+                  <th colspan="2"><?=gettext("Confirm and modify option");?></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="width:22%"><a id="help_for_csr_file_view" href="#" class="showhelp"><i class="fa fa-info-circle"></i> </a><?=gettext('Certificate Signing Request File');?></td>
+                  <td style="width:78%">
+                    <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
+                    <div class="hidden" data-for="help_for_csr_file_view">
+                      <?=gettext('X509 extensions are ignored (TODO: better English message; available ones already copied)')?>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('subjectAltName');?></td>
+                  <td style="width:78%">
+                    <input name="subject_alt_name_sign_csr" type="text" id="subject_alt_name_sign_csr" size="5" value="<?=$pconfig['subject_alt_name_sign_csr'];?>"/>
+                  </td>
+                </tr>
+                <!-- TODO: Some other extension values -->
               </tbody>
             </table>
             <!-- internal cert -->
