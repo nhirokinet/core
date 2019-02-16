@@ -94,6 +94,7 @@ function parse_csr($csr)
         return array('parse_success' => false);
     }
 
+    // TODO: error check
     $csr_obj = \X509\CertificationRequest\CertificationRequest::fromPEM(Sop\CryptoEncoding\PEM::fromString($csr));
 
     $csr_attrs = $csr_obj->certificationRequestInfo()->attributes();
@@ -118,9 +119,25 @@ function parse_csr($csr)
                                     continue;
                                 }
                                 // TODO: add other name types (email, uri)
+                                continue;
                             }
                         }
-                        // TODO: add other extension types (keyusage, extendedkeyusage, ca flag)
+                        if ($extension instanceof \X509\Certificate\Extension\KeyUsageExtension) {
+                            // TODO
+                            //var_dump($extension);
+                            continue;
+                        }
+                        if ($extension instanceof \X509\Certificate\Extension\ExtendedKeyUsageExtension) {
+                            // TODO
+                            //var_dump($extension);
+                            continue;
+                        }
+                        if ($extension instanceof \X509\Certificate\Extension\BasicConstraintsExtension) {
+                            $ret['basicConstraints'] = 'CA:' . ($extension->isCA() ? 'TRUE' : 'FALSE');
+                            continue;
+                        }
+
+                        // x509 extensions which is not listed here is currently not supported.
                     }
                 }
             }
@@ -577,6 +594,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     if (isset($pconfig['subject_alt_name_sign_csr']) && $pconfig['subject_alt_name_sign_csr'] !== '') {
                         $dn['subjectAltName'] = $pconfig['subject_alt_name_sign_csr'];
                     }
+                    if (isset($pconfig['basic_constraints_sign_csr']) && $pconfig['basic_constraints_sign_csr'] !== '') {
+                        // TODO: this code has security issue
+                        $dn['basicConstraints'] = $pconfig['basic_constraints_sign_csr'];
+                    }
                     if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
                                        $pconfig['digest_alg_sign_csr'], $dn)) {
                         $input_errors = array();
@@ -810,6 +831,7 @@ if (empty($act)) {
                         $('#x509_extension_step_sign_cert_csr').removeClass('hidden');
                         $('#subject_sign_csr').text(subject_text);
                         $('#subject_alt_name_sign_csr').val(data.subjectAltName);
+                        $('#basic_constraints_sign_csr').val(data.basicConstraints);
                         $('#submit').removeClass('hidden');
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
@@ -1140,9 +1162,17 @@ $( document ).ready(function() {
                   </td>
                 </tr>
                 <tr>
+                  <!-- TODO: validation, better UI -->
                   <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('subjectAltName');?></td>
                   <td style="width:78%">
                     <input name="subject_alt_name_sign_csr" type="text" id="subject_alt_name_sign_csr" size="5" value="<?=$pconfig['subject_alt_name_sign_csr'];?>"/>
+                  </td>
+                </tr>
+                <tr>
+                  <!-- TODO: validation, better UI -->
+                  <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('basicConstraints');?></td>
+                  <td style="width:78%">
+                    <input name="basic_constraints_sign_csr" type="text" id="basic_constraints_sign_csr" size="5" value="<?=$pconfig['basic_constraints_sign_csr'];?>"/>
                   </td>
                 </tr>
                 <!-- TODO: Some other extension values -->
