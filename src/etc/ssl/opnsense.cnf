@@ -295,7 +295,7 @@ keyUsage               = nonRepudiation, digitalSignature, keyEncipherment
 
 [ sign_csr ]
 
-nsComment              = "OPNsense Generated Combined Client/Server Certificate"
+nsComment              = "OPNsense Generated Certificate"
 subjectKeyIdentifier   = hash
 authorityKeyIdentifier = keyid,issuer:always
 
