@@ -94,8 +94,11 @@ function parse_csr($csr)
         return array('parse_success' => false);
     }
 
-    // TODO: error check
-    $csr_obj = \X509\CertificationRequest\CertificationRequest::fromPEM(Sop\CryptoEncoding\PEM::fromString($csr));
+    try {
+        $csr_obj = \X509\CertificationRequest\CertificationRequest::fromPEM(Sop\CryptoEncoding\PEM::fromString($csr));
+    } catch (\UnexpectedValueException $e) {
+        return array('parse_success' => false);
+    }
 
     $csr_attrs = $csr_obj->certificationRequestInfo()->attributes();
 
@@ -107,18 +110,28 @@ function parse_csr($csr)
                     foreach ($value->extensions() as $extension) {
                         if ($extension instanceof \X509\Certificate\Extension\SubjectAlternativeNameExtension) {
                             foreach ($extension->names() as $name) {
+                                // Supporting DNS, IP, email, and URI
                                 if ($name instanceof \X509\GeneralName\DNSName) {
-                                    if ($san_str !== '') {$san_str .= ' ';}
+                                    if ($san_str !== '') {$san_str .= ', ';}
                                     $san_str .= 'DNS:' . $name->name(); // TODO: this is bad idea: better array when introducing actual UI
                                     continue;
                                 }
                                 if ($name instanceof \X509\GeneralName\IPAddress) {
                                     // v4 or v6 does not matter here
-                                    if ($san_str !== '') {$san_str .= ' ';}
+                                    if ($san_str !== '') {$san_str .= ', ';}
                                     $san_str .= 'IP:' . $name->address(); // TODO: this is bad idea: better array when introducing actual UI
                                     continue;
                                 }
-                                // TODO: add other name types (email, uri)
+                                if ($name instanceof \X509\GeneralName\RFC822Name) {
+                                    if ($san_str !== '') {$san_str .= ', ';}
+                                    $san_str .= 'email:' . $name->email(); // TODO: this is bad idea: better array when introducing actual UI
+                                    continue;
+                                }
+                                if ($name instanceof \X509\GeneralName\UniformResourceIdentifier) {
+                                    if ($san_str !== '') {$san_str .= ', ';}
+                                    $san_str .= 'URI:' . $name->uri(); // TODO: this is bad idea: better array when introducing actual UI
+                                    continue;
+                                }
                                 continue;
                             }
                         }
@@ -953,6 +966,7 @@ if (empty($act)) {
             $("#existing").addClass("hidden");
             $("#sign_cert_csr").addClass("hidden");
             $("#x509_extension_sign_cert_csr").addClass("hidden");
+            $('#x509_extension_step_sign_cert_csr').addClass('hidden');
             if ($(this).val() == "import") {
                 $("#import").removeClass("hidden");
                 $("#submit").removeClass("hidden");
@@ -966,6 +980,8 @@ if (empty($act)) {
                 $("#submit").removeClass("hidden");
             } else if ($(this).val() == "sign_cert_csr") {
                 $("#sign_cert_csr").removeClass("hidden");
+                $('#next_button_for_x509_extension_step_sign_csr').removeClass('hidden');
+                $('#csr').prop('readonly', false);
             } else {
                 $("#existing").removeClass("hidden");
                 $("#submit").removeClass("hidden");
