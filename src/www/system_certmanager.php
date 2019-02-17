@@ -421,8 +421,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
       if (!isset($_GET['csr'])) {
         http_response_code(400);
-        // TODO: use gettext() and proper HTML/javascript escape in whole system (or maybe no worry of special character for texts from gettext()?)
-        echo json_encode(array('error' => 'Invalid Request', 'error_detail' => 'No csr parameter in query'));
+        echo json_encode(array('error' => gettext('Invalid Request'), 'error_detail' => gettext('No csr parameter in query')));
         exit;
       }
 
@@ -430,8 +429,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
       if ($parsed_result['parse_success'] !== true) {
         http_response_code(400);
-        // TODO: use gettext() and proper HTML/javascript escape in whole system (or maybe no worry of special character for texts from gettext()?)
-        echo json_encode(array('error' => 'CSR file is invalid', 'error_detail' => 'Could not parse CSR file.'));
+        echo json_encode(array('error' => gettext('CSR file is invalid'), 'error_detail' => gettext('Could not parse CSR file.')));
         exit;
       }
 
@@ -1050,7 +1048,6 @@ if (empty($act)) {
 
     // parameter 'type' must not include non-alphabet characters 
     function addRowAltSignCSR(type, value) {
-        // TODO: hard to read
         $('#subject_alt_name_sign_csr_table > tbody').append('<tr style="background-color: rgb(251, 251, 251);"> <td style="background-color: inherit;"> <select name="altname_type_sign_csr[]"> <option value="DNS">DNS</option> <option value="IP">IP</option> <option value="email">email</option> <option value="URI">URI</option> </select> </td> <td style="background-color: inherit;"> <input name="altname_value_sign_csr[]" type="text" size="20" value="" autocomplete="off"> </td> <td style="background-color: inherit;"> <div style="cursor:pointer;" class="act-removerow-altnm-sign-csr btn btn-default btn-xs" onclick="$(this).parent().parent().remove();"><i class="fa fa-minus fa-fw"></i></div> </td> </tr>');
         console.log('#subject_alt_name_sign_csr_table > tbody > tr:last > td > select > option[value="' + type + '"]');
         $('#subject_alt_name_sign_csr_table > tbody > tr:last > td > select > option[value="' + type + '"]').each(function(){
@@ -1318,10 +1315,9 @@ $( document ).ready(function() {
                   <td style="width:22%"><a id="help_for_csr_sign_csr" href="#" class="showhelp"><i class="fa fa-info-circle"></i></a> <?=gettext("CSR file");?></td>
                   <td style="width:78%">
                     <textarea name="csr" id="csr" cols="65" rows="7"><?=$pconfig['csr'];?></textarea><br/>
-                    <!-- TODO: nice English message that indicates x509 extensions are ignored unless copied to below, rather result is (here.publickey + below new table). -->
                     <a href="#" class="csr_info_for_sign_csr btn btn-secondary"><?=gettext("Show Detail");?></a><br/>
                     <div class="hidden" data-for="help_for_csr_sign_csr">
-                      <?=gettext("Paste the CSR file here.");?>
+                      <?=gettext("Paste the CSR file here. (TODO: good English explanations. x509 extensions that OPNsense knows is automatically copied when clicking Next button and modifiable, and others are ignored)");?>
                     </div>
                   </td>
                 </tr>
