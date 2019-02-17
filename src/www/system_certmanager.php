@@ -534,7 +534,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         $altnames = array();
         do_input_validation($pconfig, $reqdfields, $reqdfieldsn, $input_errors);
-        if (isset($pconfig['altname_value']) && $pconfig['certmethod'] != "import" && $pconfig['certmethod'] != "existing") {
+        if (isset($pconfig['altname_value']) && $pconfig['certmethod'] != "import" && $pconfig['certmethod'] != "existing" && $pconfig['certmethod'] != 'sign_cert_csr') {
             /* subjectAltNames */
             foreach ($pconfig['altname_type'] as $altname_seq => $altname_type) {
                 if (!empty($pconfig['altname_value'][$altname_seq])) {
@@ -618,6 +618,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if ($pconfig['certmethod'] === 'sign_cert_csr') {
             $dn = array();
             if (isset($pconfig['key_usage_sign_csr'])) {
+                {
+                    $san_str = '';
+
+                    for ($i = 0; $i < count($pconfig['altname_type_sign_csr']); ++$i) {
+                        if ($san_str !== '') {
+                            $san_str .= ', ';
+                        }
+                        // TODO: validation
+                        $san_str .= $pconfig['altname_type_sign_csr'][$i] . ':' . $pconfig['altname_value_sign_csr'][$i];
+                    }
+                    if ($san_str !== '') {
+                        $dn['subjectAltName'] = $san_str;
+                    }
+                }
                 if (is_array($pconfig['key_usage_sign_csr']) && count($pconfig['key_usage_sign_csr']) > 0) {
                     $resstr = '';
                     foreach ($pconfig['key_usage_sign_csr'] as $item) {
@@ -712,10 +726,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
 
                 if ($pconfig['certmethod'] === 'sign_cert_csr') {
-                    if (isset($pconfig['subject_alt_name_sign_csr']) && $pconfig['subject_alt_name_sign_csr'] !== '') {
-                        // TODO: this code has security issue
-                        $dn['subjectAltName'] = $pconfig['subject_alt_name_sign_csr'];
-                    }
                     if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
                                        $pconfig['digest_alg_sign_csr'], $dn)) {
                         $input_errors = array();
@@ -949,18 +959,11 @@ if (empty($act)) {
                         $('#x509_extension_step_sign_cert_csr').removeClass('hidden');
                         $('#subject_sign_csr').text(subject_text);
                         if ('subjectAltName' in data) {
-                                san_str = '';
                                 data.subjectAltName.forEach(function(item) {
-                                        if (san_str != '') {
-                                                san_str += ', ';
-                                        }
-                                        san_str += item.type + ':' + item.value;
-                                 
-
+                                        addRowAltSignCSR(item.type, item.value);
                                 });
-                                $('#subject_alt_name_sign_csr').val(san_str);
                         } else {
-                                $('#subject_alt_name_sign_csr').val('');
+                               // TODO
                         }
                         if ('basicConstraints' in data) {
                                 $('#basic_constraints_enabled_sign_csr').prop('checked', true);
@@ -1021,6 +1024,24 @@ if (empty($act)) {
         });
     });
 
+    // parameter 'type' must not include non-alphabet characters 
+    function addRowAltSignCSR(type, value) {
+        // TODO: delete the row
+        // TODO: hard to read
+        $('#subject_alt_name_sign_csr_table > tbody').append('<tr style="background-color: rgb(251, 251, 251);"> <td style="background-color: inherit;"> <select name="altname_type_sign_csr[]"> <option value="DNS">DNS</option> <option value="IP">IP</option> <option value="email">email</option> <option value="URI">URI</option> </select> </td> <td style="background-color: inherit;"> <input name="altname_value_sign_csr[]" type="text" size="20" value="" autocomplete="off"> </td> <td style="background-color: inherit;"> <div style="cursor:pointer;" class="act-removerow-altnm btn btn-default btn-xs"><i class="fa fa-minus fa-fw"></i></div> </td> </tr>');
+        console.log('#subject_alt_name_sign_csr_table > tbody > tr:last > td > select > option[value="' + type + '"]');
+        $('#subject_alt_name_sign_csr_table > tbody > tr:last > td > select > option[value="' + type + '"]').each(function(){
+            $(this).prop('selected', true);
+        });
+        $('#subject_alt_name_sign_csr_table > tbody > tr:last > td > input').each(function(){
+            $(this).val(value);
+        });
+    }
+
+    $("#addNewAltNmSignCSR").click(function(){
+        addRowAltSignCSR('', '');
+    });
+
     /**
      * remove row from altNametable
      */
@@ -1049,8 +1070,9 @@ if (empty($act)) {
             });
             $(".act-removerow-altnm").click(removeRowAltNm);
         });
-
         $(".act-removerow-altnm").click(removeRowAltNm);
+
+
 
 
         $("#certmethod").change(function(){
@@ -1305,7 +1327,25 @@ $( document ).ready(function() {
                     <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('subjectAltName');?></td>
                     <td style="width:78%">
-                      <input name="subject_alt_name_sign_csr" type="text" id="subject_alt_name_sign_csr" size="5" value="<?=$pconfig['subject_alt_name_sign_csr'];?>"/>
+                      <table class="table table-condensed" id="subject_alt_name_sign_csr_table">
+                        <thead>
+                            <tr>
+                              <th><?=gettext("Type");?></th>
+                              <th><?=gettext("Value");?></th>
+                              <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colspan="2"></td>
+                            <td>
+                              <div id="addNewAltNmSignCSR" style="cursor:pointer;" class="btn btn-default btn-xs"><i class="fa fa-plus fa-fw"></i></div>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </td>
                   </tr>
                   <tr>
