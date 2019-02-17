@@ -170,16 +170,7 @@ function parse_csr($csr)
                         }
 
                         if ($extension instanceof \X509\Certificate\Extension\ExtendedKeyUsageExtension) {
-                            $keyusages = array();
-                            if ($extension->has(\X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_SERVER_AUTH)) {
-                                array_push($keyusages, \X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_SERVER_AUTH);
-                            }
-                            if ($extension->has(\X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_CLIENT_AUTH)) {
-                                array_push($keyusages, \X509\Certificate\Extension\ExtendedKeyUsageExtension::OID_CLIENT_AUTH);
-                            }
-                            // TODO: add all here https://github.com/sop/x509/blob/master/lib/X509/Certificate/Extension/ExtendedKeyUsageExtension.php
-
-                            $ret['extendedKeyUsage'] = join(',', $keyusages); // TODO: this is bad idea: better array when introducing actual UI
+                            $ret['extendedKeyUsage'] = join(',', $extensions->purposes()); // TODO: this is bad idea: better array when introducing actual UI
 
                             continue;
                         }
