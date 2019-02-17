@@ -210,8 +210,8 @@ $key_usages = array(
 // Note that keys include '.' and have difficulty in HTML class and jQuery
 // replace . to _ when copy to HTML class
 $extended_key_usages = array(
-    // copied from sop/x509
-    // https://github.com/sop/x509/blob/master/lib/X509/Certificate/Extension/ExtendedKeyUsageExtension.php
+    // copied from sop/x509 and transformed https://github.com/sop/x509/blob/6991805a587b01281b4646e7d17c7222dc1d7e6d/lib/X509/Certificate/Extension/ExtendedKeyUsageExtension.php
+    // mostly list is list of what sop/x509 supports, so cannnot change, but human-readable texts are TODO
     '1.3.6.1.5.5.7.3.1'  => gettext('SERVER_AUTH'),
     '1.3.6.1.5.5.7.3.2'  => gettext('CLIENT_AUTH'),
     '1.3.6.1.5.5.7.3.3'  => gettext('CODE_SIGNING'),
@@ -648,6 +648,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     }
                     $dn['extendedKeyUsage'] = $resstr;
                 }
+                if (isset($pconfig['basic_constraints_is_ca_sign_csr']) && $pconfig['basic_constraints_is_ca_sign_csr'] === 'true') {
+                    $dn['basicConstraints'] = 'CA:' . ((isset($pconfig['basic_constraints_is_ca_sign_csr']) && $pconfig['basic_constraints_is_ca_sign_csr'] === 'true') ? 'TRUE' : 'false');
+                    if (isset($pconfig['basic_constraints_path_len_sign_csr']) && $pconfig['basic_constraints_path_len_sign_csr'] != '') {
+                        $dn['basicConstraints'] .= ', pathlen:' . ((int) $pconfig['basic_constraints_path_len_sign_csr']);
+                    }
+                }
             }
         }
 
@@ -709,10 +715,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     if (isset($pconfig['subject_alt_name_sign_csr']) && $pconfig['subject_alt_name_sign_csr'] !== '') {
                         // TODO: this code has security issue
                         $dn['subjectAltName'] = $pconfig['subject_alt_name_sign_csr'];
-                    }
-                    if (isset($pconfig['basic_constraints_sign_csr']) && $pconfig['basic_constraints_sign_csr'] !== '') {
-                        // TODO: this code has security issue
-                        $dn['basicConstraints'] = $pconfig['basic_constraints_sign_csr'];
                     }
                     if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
                                        $pconfig['digest_alg_sign_csr'], $dn)) {
@@ -961,14 +963,13 @@ if (empty($act)) {
                                 $('#subject_alt_name_sign_csr').val('');
                         }
                         if ('basicConstraints' in data) {
-                                basicConstraintsStr = 'CA:' + (data.basicConstraints.CA ? 'TRUE' : 'FALSE');
-                                if ('pathlen' in data.basicConstraints) {
-                                        basicConstraintsStr += ', pathlen:' + data.basicConstraints.pathlen;
-                                }
-                                $('#basic_constraints_sign_csr').val(basicConstraintsStr);
+                                $('#basic_constraints_enabled_sign_csr').prop('checked', true);
+                                $('#basic_constraints_is_ca_sign_csr').prop('checked', data.basicConstraints.CA);
+                                $('#basic_constraints_path_len_sign_csr').val(('pathlen' in data.basicConstraints) ? data.basicConstraints.pathlen : '');
                         } else {
-                                $('#basic_constraints_sign_csr').val('');
+                                $('#basic_constraints_enabled_sign_csr').prop('checked', false);
                         }
+                        basic_constraints_enabled_sign_csr_refresh();
 
                         $('#key_usage_sign_csr option').removeAttr('selected');
                         if ('keyUsage' in data) {
@@ -1311,7 +1312,16 @@ $( document ).ready(function() {
                     <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('basicConstraints');?></td>
                     <td style="width:78%">
-                      <input name="basic_constraints_sign_csr" type="text" id="basic_constraints_sign_csr" size="5" value="<?=$pconfig['basic_constraints_sign_csr'];?>"/>
+                      <script type="text/javascript">
+                      function basic_constraints_enabled_sign_csr_refresh() {
+                          basic_constraints_enabled = $('#basic_constraints_enabled_sign_csr').prop('checked');
+                          $('#basic_constraints_is_ca_sign_csr').prop('disabled', !basic_constraints_enabled)
+                          $('#basic_constraints_path_len_sign_csr').prop('disabled', !basic_constraints_enabled)
+                      }
+                      </script>
+                      <input type="checkbox" name="basic_constraints_enabled_sign_csr"  id="basic_constraints_enabled_sign_csr"  value="true" onchange="basic_constraints_enabled_sign_csr_refresh();" /> <?= gettext('basicConstraints enabled'); ?><br />
+                      <input type="checkbox" name="basic_constraints_is_ca_sign_csr"    id="basic_constraints_is_ca_sign_csr"    value="true" /> <?= gettext('is CA'); ?><br />
+                      <?= gettext('Path Len'); ?>: <input type="text"     name="basic_constraints_path_len_sign_csr" id="basic_constraints_path_len_sign_csr" size="5" value="<?=$pconfig['basic_constraints_sign_csr'];?>"/>
                     </td>
                   </tr>
                   <tr>
