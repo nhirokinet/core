@@ -211,6 +211,7 @@ $key_usages = array(
 // replace . to _ when copy to HTML class
 $extended_key_usages = array(
     // copied from sop/x509
+    // https://github.com/sop/x509/blob/master/lib/X509/Certificate/Extension/ExtendedKeyUsageExtension.php
     '1.3.6.1.5.5.7.3.1'  => gettext('SERVER_AUTH'),
     '1.3.6.1.5.5.7.3.2'  => gettext('CLIENT_AUTH'),
     '1.3.6.1.5.5.7.3.3'  => gettext('CODE_SIGNING'),
