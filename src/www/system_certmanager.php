@@ -102,38 +102,34 @@ function parse_csr($csr)
 
     $csr_attrs = $csr_obj->certificationRequestInfo()->attributes();
 
-    $san_str = ''; // TODO: this is bad idea: better array when introducing actual UI
     foreach ($csr_attrs as $attr) {
         if ($attr instanceof \X501\ASN1\Attribute) {
             foreach ($attr->values() as $value) {
                 if ($value instanceof \X509\CertificationRequest\Attribute\ExtensionRequestValue) {
                     foreach ($value->extensions() as $extension) {
                         if ($extension instanceof \X509\Certificate\Extension\SubjectAlternativeNameExtension) {
+                            $san = array();
                             foreach ($extension->names() as $name) {
                                 // Supporting DNS, IP, email, and URI
                                 if ($name instanceof \X509\GeneralName\DNSName) {
-                                    if ($san_str !== '') {$san_str .= ', ';}
-                                    $san_str .= 'DNS:' . $name->name(); // TODO: this is bad idea: better array when introducing actual UI
+                                    array_push($san, array('type'=> 'DNS', 'value'=> $name->name()));
                                     continue;
                                 }
                                 if ($name instanceof \X509\GeneralName\IPAddress) {
                                     // v4 or v6 does not matter here
-                                    if ($san_str !== '') {$san_str .= ', ';}
-                                    $san_str .= 'IP:' . $name->address(); // TODO: this is bad idea: better array when introducing actual UI
+                                    array_push($san, array('type'=> 'IP', 'value'=> $name->address()));
                                     continue;
                                 }
                                 if ($name instanceof \X509\GeneralName\RFC822Name) {
-                                    if ($san_str !== '') {$san_str .= ', ';}
-                                    $san_str .= 'email:' . $name->email(); // TODO: this is bad idea: better array when introducing actual UI
+                                    array_push($san, array('type'=> 'email', 'value'=> $name->email()));
                                     continue;
                                 }
                                 if ($name instanceof \X509\GeneralName\UniformResourceIdentifier) {
-                                    if ($san_str !== '') {$san_str .= ', ';}
-                                    $san_str .= 'URI:' . $name->uri(); // TODO: this is bad idea: better array when introducing actual UI
+                                    array_push($san, array('type'=> 'URI', 'value'=> $name->uri()));
                                     continue;
                                 }
-                                continue;
                             }
+                            $ret['subjectAltName'] = $san;
                         }
                         if ($extension instanceof \X509\Certificate\Extension\KeyUsageExtension) {
                             $keyusages = array();
@@ -163,24 +159,21 @@ function parse_csr($csr)
                                 array_push($keyusages, 'enCipherOnly');
                             }
 
-                            $ret['keyUsage'] = join(',', $keyusages); // TODO: this is bad idea: better array when introducing actual UI
-
-                            // other options of basicConstraints is not supported by sop/x509 as of 17/Feb/2019.
+                            $ret['keyUsage'] = $keyusages;
                             continue;
                         }
 
                         if ($extension instanceof \X509\Certificate\Extension\ExtendedKeyUsageExtension) {
-                            $ret['extendedKeyUsage'] = join(',', $extensions->purposes()); // TODO: this is bad idea: better array when introducing actual UI
-
+                            $ret['extendedKeyUsage'] = $extension->purposes();
                             continue;
                         }
 
                         if ($extension instanceof \X509\Certificate\Extension\BasicConstraintsExtension) {
-                            $ret['basicConstraints'] = 'CA:' . ($extension->isCA() ? 'TRUE' : 'FALSE'); // TODO: this is bad idea: better array when introducing actual UI
+                            $ret['basicConstraints'] = array();
+                            $ret['basicConstraints']['CA'] = $extension->isCA();
                             if ($extension->hasPathLen()) { 
-                                $ret['basicConstraints'] .= ', pathlen:' . $extension->pathLen(); // TODO: this is bad idea: better array when introducing actual UI
+                                $ret['basicConstraints']['pathlen'] = $extension->pathLen();
                             }
-                            // other options of basicConstraints is not supported by sop/x509 as of 17/Feb/2019.
                             continue;
                         }
 
@@ -190,7 +183,6 @@ function parse_csr($csr)
             }
         }
     }
-    $ret['subjectAltName'] = $san_str;
 
     return $ret;
 }
@@ -881,10 +873,31 @@ if (empty($act)) {
                         $('#csr').prop('readonly', true);
                         $('#x509_extension_step_sign_cert_csr').removeClass('hidden');
                         $('#subject_sign_csr').text(subject_text);
-                        $('#subject_alt_name_sign_csr').val(data.subjectAltName);
-                        $('#basic_constraints_sign_csr').val(data.basicConstraints);
-                        $('#key_usage_sign_csr').val(data.keyUsage);
-                        $('#extended_key_usage_sign_csr').val(data.extendedKeyUsage);
+                        if ('subjectAltName' in data) {
+                                san_str = '';
+                                data.subjectAltName.forEach(function(item) {
+                                        if (san_str != '') {
+                                                san_str += ', ';
+                                        }
+                                        san_str += item.type + ':' + item.value;
+                                 
+
+                                });
+                                $('#subject_alt_name_sign_csr').val(san_str);
+                        } else {
+                                $('#subject_alt_name_sign_csr').val('');
+                        }
+                        if ('basicConstraints' in data) {
+                                basicConstraintsStr = 'CA:' + (data.basicConstraints.CA ? 'TRUE' : 'FALSE');
+                                if ('pathlen' in data.basicConstraints) {
+                                        basicConstraintsStr += ', pathlen:' + data.basicConstraints.pathlen;
+                                }
+                                $('#basic_constraints_sign_csr').val(basicConstraintsStr);
+                        } else {
+                                $('#basic_constraints_sign_csr').val('');
+                        }
+                        $('#key_usage_sign_csr').val(data.keyUsage.join(', '));
+                        $('#extended_key_usage_sign_csr').val(data.extendedKeyUsage.join(', '));
                         $('#submit').removeClass('hidden');
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
