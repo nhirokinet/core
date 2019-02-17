@@ -194,34 +194,42 @@ function parse_csr($csr)
 // )
 //
 // errors is added to $input_errors
+// returns true:  on success
+//         false: on error, with adding something to $input_errors.
 function is_valid_alt_value($altname, &$input_errors) {
     switch ($altname['type']) {
         case "DNS":
             $dns_regex = '/^(?:(?:[a-z0-9_\*]|[a-z0-9_][a-z0-9_\-]*[a-z0-9_])\.)*(?:[a-z0-9_]|[a-z0-9_][a-z0-9_\-]*[a-z0-9_])$/i';
             if (!preg_match($dns_regex, $altname['value'])) {
                 $input_errors[] = gettext("DNS subjectAltName values must be valid hostnames or FQDNs");
+                return false;
             }
-            break;
+            return true;
         case "IP":
             if (!is_ipaddr($altname['value'])) {
                 $input_errors[] = gettext("IP subjectAltName values must be valid IP Addresses");
+                return false;
             }
-            break;
+            return true;
         case "email":
             if (empty($altname['value'])) {
                 $input_errors[] = gettext("You must provide an email address for this type of subjectAltName");
+                return false;
             }
             if (preg_match("/[\!\#\$\%\^\(\)\~\?\>\<\&\/\\\,\"\']/", $altname['value'])) {
                 $input_errors[] = gettext("The email provided in a subjectAltName contains invalid characters.");
+                return false;
             }
-            break;
+            return true;
         case "URI":
             if (!is_URL($altname['value'])) {
                 $input_errors[] = gettext("URI subjectAltName types must be a valid URI");
+                return false;
             }
-            break;
+            return true;
         default:
             $input_errors[] = gettext("Unrecognized subjectAltName type.");
+            return false;
     }
 
 }
@@ -582,7 +590,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
             /* Input validation for subjectAltNames */
             foreach ($altnames as $altname) {
-                is_valid_alt_value($altname, $input_errors);
+                if (! is_valid_alt_value($altname, $input_errors)) {
+                    break;
+                }
             }
 
             /* Make sure we do not have invalid characters in the fields for the certificate */
@@ -632,10 +642,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     $san_str = '';
 
                     for ($i = 0; $i < count($pconfig['altname_type_sign_csr']); ++$i) {
+                        if ($pconfig['altname_value_sign_csr'][$i] === '') {
+                            continue;
+                        }
+                        if (! is_valid_alt_value(array('type' => $pconfig['altname_type_sign_csr'][$i], 'value' => $pconfig['altname_value_sign_csr'][$i]), $input_errors)) {
+                            break;
+                        }
                         if ($san_str !== '') {
                             $san_str .= ', ';
                         }
-                        is_valid_alt_value(array('type' => $pconfig['altname_type_sign_csr'][$i], 'value' => $pconfig['altname_value_sign_csr'][$i]), $input_errors);
                         $san_str .= $pconfig['altname_type_sign_csr'][$i] . ':' . $pconfig['altname_value_sign_csr'][$i];
                     }
                     if ($san_str !== '') {
@@ -968,12 +983,11 @@ if (empty($act)) {
                         $('#csr').prop('readonly', true);
                         $('#x509_extension_step_sign_cert_csr').removeClass('hidden');
                         $('#subject_sign_csr').text(subject_text);
+                        $('#subject_alt_name_sign_csr_table > tbody').html('');
                         if ('subjectAltName' in data) {
                                 data.subjectAltName.forEach(function(item) {
                                         addRowAltSignCSR(item.type, item.value);
                                 });
-                        } else {
-                               // TODO
                         }
                         if ('basicConstraints' in data) {
                                 $('#basic_constraints_enabled_sign_csr').prop('checked', true);
@@ -1036,9 +1050,8 @@ if (empty($act)) {
 
     // parameter 'type' must not include non-alphabet characters 
     function addRowAltSignCSR(type, value) {
-        // TODO: delete the row
         // TODO: hard to read
-        $('#subject_alt_name_sign_csr_table > tbody').append('<tr style="background-color: rgb(251, 251, 251);"> <td style="background-color: inherit;"> <select name="altname_type_sign_csr[]"> <option value="DNS">DNS</option> <option value="IP">IP</option> <option value="email">email</option> <option value="URI">URI</option> </select> </td> <td style="background-color: inherit;"> <input name="altname_value_sign_csr[]" type="text" size="20" value="" autocomplete="off"> </td> <td style="background-color: inherit;"> <div style="cursor:pointer;" class="act-removerow-altnm btn btn-default btn-xs"><i class="fa fa-minus fa-fw"></i></div> </td> </tr>');
+        $('#subject_alt_name_sign_csr_table > tbody').append('<tr style="background-color: rgb(251, 251, 251);"> <td style="background-color: inherit;"> <select name="altname_type_sign_csr[]"> <option value="DNS">DNS</option> <option value="IP">IP</option> <option value="email">email</option> <option value="URI">URI</option> </select> </td> <td style="background-color: inherit;"> <input name="altname_value_sign_csr[]" type="text" size="20" value="" autocomplete="off"> </td> <td style="background-color: inherit;"> <div style="cursor:pointer;" class="act-removerow-altnm-sign-csr btn btn-default btn-xs" onclick="$(this).parent().parent().remove();"><i class="fa fa-minus fa-fw"></i></div> </td> </tr>');
         console.log('#subject_alt_name_sign_csr_table > tbody > tr:last > td > select > option[value="' + type + '"]');
         $('#subject_alt_name_sign_csr_table > tbody > tr:last > td > select > option[value="' + type + '"]').each(function(){
             $(this).prop('selected', true);
