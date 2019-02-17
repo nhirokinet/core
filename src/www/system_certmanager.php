@@ -207,6 +207,40 @@ $key_usages = array(
     'cRLSign'          => gettext('cRLSign'),
     'encipherOnly'     => gettext('encipherOnly'),
 );
+// Note that keys include '.' and have difficulty in HTML class and jQuery
+// replace . to _ when copy to HTML class
+$extended_key_usages = array(
+    // copied from sop/x509
+    '1.3.6.1.5.5.7.3.1'  => gettext('SERVER_AUTH'),
+    '1.3.6.1.5.5.7.3.2'  => gettext('CLIENT_AUTH'),
+    '1.3.6.1.5.5.7.3.3'  => gettext('CODE_SIGNING'),
+    '1.3.6.1.5.5.7.3.4'  => gettext('EMAIL_PROTECTION'),
+    '1.3.6.1.5.5.7.3.5'  => gettext('IPSEC_END_SYSTEM'),
+    '1.3.6.1.5.5.7.3.6'  => gettext('IPSEC_TUNNEL'),
+    '1.3.6.1.5.5.7.3.7'  => gettext('IPSEC_USER'),
+    '1.3.6.1.5.5.7.3.8'  => gettext('TIME_STAMPING'),
+    '1.3.6.1.5.5.7.3.9'  => gettext('OCSP_SIGNING'),
+    '1.3.6.1.5.5.7.3.10' => gettext('DVCS'),
+    '1.3.6.1.5.5.7.3.11' => gettext('SBGP_CERT_AA_SERVER_AUTH'),
+    '1.3.6.1.5.5.7.3.12' => gettext('SCVP_RESPONDER'),
+    '1.3.6.1.5.5.7.3.13' => gettext('EAP_OVER_PPP'),
+    '1.3.6.1.5.5.7.3.14' => gettext('EAP_OVER_LAN'),
+    '1.3.6.1.5.5.7.3.15' => gettext('SCVP_SERVER'),
+    '1.3.6.1.5.5.7.3.16' => gettext('SCVP_CLIENT'),
+    '1.3.6.1.5.5.7.3.17' => gettext('IPSEC_IKE'),
+    '1.3.6.1.5.5.7.3.18' => gettext('CAPWAP_AC'),
+    '1.3.6.1.5.5.7.3.19' => gettext('CAPWAP_WTP'),
+    '1.3.6.1.5.5.7.3.20' => gettext('SIP_DOMAIN'),
+    '1.3.6.1.5.5.7.3.21' => gettext('SECURE_SHELL_CLIENT'),
+    '1.3.6.1.5.5.7.3.22' => gettext('SECURE_SHELL_SERVER'),
+    '1.3.6.1.5.5.7.3.23' => gettext('SEND_ROUTER'),
+    '1.3.6.1.5.5.7.3.24' => gettext('SEND_PROXY'),
+    '1.3.6.1.5.5.7.3.25' => gettext('SEND_OWNER'),
+    '1.3.6.1.5.5.7.3.26' => gettext('SEND_PROXIED_OWNER'),
+    '1.3.6.1.5.5.7.3.27' => gettext('CMC_CA'),
+    '1.3.6.1.5.5.7.3.28' => gettext('CMC_RA'),
+    '1.3.6.1.5.5.7.3.29' => gettext('CMC_ARCHIVE'),
+);
 
 // config reference pointers
 $a_user = &config_read_array('system', 'user');
@@ -579,6 +613,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
         }
 
+        // validation and at the same time create $dn for sign_cert_csr
+        if ($pconfig['certmethod'] === 'sign_cert_csr') {
+            $dn = array();
+            if (isset($pconfig['key_usage_sign_csr'])) {
+                if (is_array($pconfig['key_usage_sign_csr']) && count($pconfig['key_usage_sign_csr']) > 0) {
+                    $resstr = '';
+                    foreach ($pconfig['key_usage_sign_csr'] as $item) {
+                        if (array_key_exists($item, $key_usages)) {
+                            if ($resstr !== '') {
+                                $resstr .= ', ';
+                            }
+                            $resstr .= $item;
+                        } else {
+                            $input_errors[] = gettext("Please select a valid keyUsage.");
+                            break;
+                        }
+                    }
+                    $dn['keyUsage'] = $resstr;
+                }
+                if (is_array($pconfig['extended_key_usage_sign_csr']) && count($pconfig['extended_key_usage_sign_csr']) > 0) {
+                    $resstr = '';
+                    foreach ($pconfig['extended_key_usage_sign_csr'] as $item) {
+                        if (array_key_exists($item, $extended_key_usages)) {
+                            if ($resstr !== '') {
+                                $resstr .= ', ';
+                            }
+                            $resstr .= $item;
+                        } else {
+                            $input_errors[] = gettext("Please select a valid extendedKeyUsage.");
+                            break;
+                        }
+                    }
+                    $dn['extendedKeyUsage'] = $resstr;
+                }
+            }
+        }
+
         /* save modifications */
         if (count($input_errors) == 0) {
             if ($pconfig['certmethod'] == "existing") {
@@ -634,7 +705,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 }
 
                 if ($pconfig['certmethod'] === 'sign_cert_csr') {
-                    $dn = array();
                     if (isset($pconfig['subject_alt_name_sign_csr']) && $pconfig['subject_alt_name_sign_csr'] !== '') {
                         // TODO: this code has security issue
                         $dn['subjectAltName'] = $pconfig['subject_alt_name_sign_csr'];
@@ -642,24 +712,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     if (isset($pconfig['basic_constraints_sign_csr']) && $pconfig['basic_constraints_sign_csr'] !== '') {
                         // TODO: this code has security issue
                         $dn['basicConstraints'] = $pconfig['basic_constraints_sign_csr'];
-                    }
-                    if (isset($pconfig['key_usage_sign_csr'])) {
-                        if (is_array($pconfig['key_usage_sign_csr']) && count($pconfig['key_usage_sign_csr']) > 0) {
-                            $resstr = '';
-                            foreach ($pconfig['key_usage_sign_csr'] as $item) {
-                                if (array_key_exists($item, $key_usages)) {
-                                    if ($resstr !== '') {
-                                        $resstr .= ', ';
-                                    }
-                                    $resstr .= $item;
-                                }
-                            }
-                            $dn['keyUsage'] = $resstr;
-                        }
-                    }
-                    if (isset($pconfig['extended_key_usage_sign_csr']) && $pconfig['extended_key_usage_sign_csr'] !== '') {
-                        // TODO: this code has security issue
-                        $dn['extendedKeyUsage'] = $pconfig['extended_key_usage_sign_csr'];
                     }
                     if (!sign_cert_csr($cert, $pconfig['caref_sign_csr'], $pconfig['csr'], (int) $pconfig['lifetime_sign_csr'],
                                        $pconfig['digest_alg_sign_csr'], $dn)) {
@@ -916,16 +968,25 @@ if (empty($act)) {
                         } else {
                                 $('#basic_constraints_sign_csr').val('');
                         }
+
                         $('#key_usage_sign_csr option').removeAttr('selected');
                         if ('keyUsage' in data) {
                                 data.keyUsage.forEach(function(item) {
-                                        console.log('#key_usage_sign_csr_' + item);
                                         $('#key_usage_sign_csr_' + item).prop('selected', true);
                                 });
 
                         }
                         $("#key_usage_sign_csr").selectpicker('refresh');
-                        $('#extended_key_usage_sign_csr').val(data.extendedKeyUsage.join(', '));
+
+                        $('#extended_key_usage_sign_csr option').removeAttr('selected');
+                        if ('extendedKeyUsage' in data) {
+                                data.extendedKeyUsage.forEach(function(item) {
+                                        $('#extended_key_usage_sign_csr_' + (item.replace(/\./g, '_'))).prop('selected', true);
+                                });
+
+                        }
+                        $("#extended_key_usage_sign_csr").selectpicker('refresh');
+
                         $('#submit').removeClass('hidden');
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
@@ -1253,7 +1314,6 @@ $( document ).ready(function() {
                     </td>
                   </tr>
                   <tr>
-                    <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('keyUsage');?></td>
                     <td style="width:78%">
                       <select name="key_usage_sign_csr[]" title="Select keyUsages..." multiple="multiple" id="key_usage_sign_csr" class="selectpicker" data-live-search="true" data-size="5" tabindex="2" <?=!empty($pconfig['associated-rule-id']) ? "disabled" : "";?>>
@@ -1268,10 +1328,17 @@ $( document ).ready(function() {
                     </td>
                   </tr>
                   <tr>
-                    <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('extendedKeyUsage');?></td>
                     <td style="width:78%">
-                      <input name="extended_key_usage_sign_csr" type="text" id="extended_key_usage_sign_csr" size="5" value="<?=$pconfig['extended_key_usage_sign_csr'];?>"/>
+                      <select name="extended_key_usage_sign_csr[]" title="Select extendedKeyUsages..." multiple="multiple" id="extended_key_usage_sign_csr" class="selectpicker" data-live-search="true" data-size="5" tabindex="2" <?=!empty($pconfig['associated-rule-id']) ? "disabled" : "";?>>
+<?php
+                      foreach ($extended_key_usages as $key => $human_readable): ?>
+                        <option value="<?=$key;?>" id="extended_key_usage_sign_csr_<?= str_replace('.', '_', $key);?>">
+                          <?= $human_readable; ?>
+                        </option>
+<?php
+                      endforeach; ?>
+                      </select>
                     </td>
                   </tr>
                   <!-- TODO: Some other extension values -->
