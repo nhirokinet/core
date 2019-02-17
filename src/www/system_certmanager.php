@@ -187,6 +187,44 @@ function parse_csr($csr)
     return $ret;
 }
 
+// altname must be like 
+// array (
+//    'type'   => (string),
+//    'value': => (string)
+// )
+//
+// errors is added to $input_errors
+function is_valid_alt_value($altname, &$input_errors) {
+    switch ($altname['type']) {
+        case "DNS":
+            $dns_regex = '/^(?:(?:[a-z0-9_\*]|[a-z0-9_][a-z0-9_\-]*[a-z0-9_])\.)*(?:[a-z0-9_]|[a-z0-9_][a-z0-9_\-]*[a-z0-9_])$/i';
+            if (!preg_match($dns_regex, $altname['value'])) {
+                $input_errors[] = gettext("DNS subjectAltName values must be valid hostnames or FQDNs");
+            }
+            break;
+        case "IP":
+            if (!is_ipaddr($altname['value'])) {
+                $input_errors[] = gettext("IP subjectAltName values must be valid IP Addresses");
+            }
+            break;
+        case "email":
+            if (empty($altname['value'])) {
+                $input_errors[] = gettext("You must provide an email address for this type of subjectAltName");
+            }
+            if (preg_match("/[\!\#\$\%\^\(\)\~\?\>\<\&\/\\\,\"\']/", $altname['value'])) {
+                $input_errors[] = gettext("The email provided in a subjectAltName contains invalid characters.");
+            }
+            break;
+        case "URI":
+            if (!is_URL($altname['value'])) {
+                $input_errors[] = gettext("URI subjectAltName types must be a valid URI");
+            }
+            break;
+        default:
+            $input_errors[] = gettext("Unrecognized subjectAltName type.");
+    }
+
+}
 // types
 $cert_methods = array(
     "import" => gettext("Import an existing Certificate"),
@@ -543,36 +581,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
 
             /* Input validation for subjectAltNames */
-            // TODO: make it a function and apply to sign_csr
             foreach ($altnames as $altname) {
-                switch ($altname['type']) {
-                    case "DNS":
-                        $dns_regex = '/^(?:(?:[a-z0-9_\*]|[a-z0-9_][a-z0-9_\-]*[a-z0-9_])\.)*(?:[a-z0-9_]|[a-z0-9_][a-z0-9_\-]*[a-z0-9_])$/i';
-                        if (!preg_match($dns_regex, $altname['value'])) {
-                            $input_errors[] = gettext("DNS subjectAltName values must be valid hostnames or FQDNs");
-                        }
-                        break;
-                    case "IP":
-                        if (!is_ipaddr($altname['value'])) {
-                            $input_errors[] = gettext("IP subjectAltName values must be valid IP Addresses");
-                        }
-                        break;
-                    case "email":
-                        if (empty($altname['value'])) {
-                            $input_errors[] = gettext("You must provide an email address for this type of subjectAltName");
-                        }
-                        if (preg_match("/[\!\#\$\%\^\(\)\~\?\>\<\&\/\\\,\"\']/", $altname['value'])) {
-                            $input_errors[] = gettext("The email provided in a subjectAltName contains invalid characters.");
-                        }
-                        break;
-                    case "URI":
-                        if (!is_URL($altname['value'])) {
-                            $input_errors[] = gettext("URI subjectAltName types must be a valid URI");
-                        }
-                        break;
-                    default:
-                        $input_errors[] = gettext("Unrecognized subjectAltName type.");
-                }
+                is_valid_alt_value($altname, $input_errors);
             }
 
             /* Make sure we do not have invalid characters in the fields for the certificate */
@@ -625,7 +635,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         if ($san_str !== '') {
                             $san_str .= ', ';
                         }
-                        // TODO: validation
+                        is_valid_alt_value(array('type' => $pconfig['altname_type_sign_csr'][$i], 'value' => $pconfig['altname_value_sign_csr'][$i]), $input_errors);
                         $san_str .= $pconfig['altname_type_sign_csr'][$i] . ':' . $pconfig['altname_value_sign_csr'][$i];
                     }
                     if ($san_str !== '') {
@@ -1324,7 +1334,6 @@ $( document ).ready(function() {
                     </td>
                   </tr>
                   <tr>
-                    <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('subjectAltName');?></td>
                     <td style="width:78%">
                       <table class="table table-condensed" id="subject_alt_name_sign_csr_table">
@@ -1349,7 +1358,6 @@ $( document ).ready(function() {
                     </td>
                   </tr>
                   <tr>
-                    <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('basicConstraints');?></td>
                     <td style="width:78%">
                       <script type="text/javascript">
@@ -1392,7 +1400,6 @@ $( document ).ready(function() {
                       </select>
                     </td>
                   </tr>
-                  <!-- TODO: Some other extension values -->
                 </tbody>
               </table>
             </div>
