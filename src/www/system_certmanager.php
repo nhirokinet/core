@@ -153,10 +153,10 @@ function parse_csr($csr)
                                 array_push($keyusages, 'keyCertSign');
                             }
                             if ($extension->isCRLSign()) {
-                                array_push($keyusages, 'cslSign');
+                                array_push($keyusages, 'cRLSign');
                             }
                             if ($extension->isEncipherOnly()) {
-                                array_push($keyusages, 'enCipherOnly');
+                                array_push($keyusages, 'encipherOnly');
                             }
 
                             $ret['keyUsage'] = $keyusages;
@@ -197,6 +197,16 @@ $cert_methods = array(
 $cert_keylens = array( "512", "1024", "2048", "3072", "4096", "8192");
 $openssl_digest_algs = array("sha1", "sha224", "sha256", "sha384", "sha512");
 $cert_types = array('usr_cert', 'server_cert', 'combined_server_client', 'v3_ca');
+$key_usages = array(
+    'digitalSignature' => gettext('digitalSignature'),
+    'nonRepudiation'   => gettext('nonRepudiation'),
+    'keyEncipherment'  => gettext('keyEncpiherment'),
+    'dataEncipherment' => gettext('dataEncipherment'),
+    'keyAgreement'     => gettext('keyAgreement'),
+    'keyCertSign'      => gettext('keyCertSign'),
+    'cRLSign'          => gettext('cRLSign'),
+    'encipherOnly'     => gettext('encipherOnly'),
+);
 
 // config reference pointers
 $a_user = &config_read_array('system', 'user');
@@ -633,9 +643,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         // TODO: this code has security issue
                         $dn['basicConstraints'] = $pconfig['basic_constraints_sign_csr'];
                     }
-                    if (isset($pconfig['key_usage_sign_csr']) && $pconfig['key_usage_sign_csr'] !== '') {
-                        // TODO: this code has security issue
-                        $dn['keyUsage'] = $pconfig['key_usage_sign_csr'];
+                    if (isset($pconfig['key_usage_sign_csr'])) {
+                        if (is_array($pconfig['key_usage_sign_csr']) && count($pconfig['key_usage_sign_csr']) > 0) {
+                            $resstr = '';
+                            foreach ($pconfig['key_usage_sign_csr'] as $item) {
+                                if (array_key_exists($item, $key_usages)) {
+                                    if ($resstr !== '') {
+                                        $resstr .= ', ';
+                                    }
+                                    $resstr .= $item;
+                                }
+                            }
+                            $dn['keyUsage'] = $resstr;
+                        }
                     }
                     if (isset($pconfig['extended_key_usage_sign_csr']) && $pconfig['extended_key_usage_sign_csr'] !== '') {
                         // TODO: this code has security issue
@@ -896,7 +916,15 @@ if (empty($act)) {
                         } else {
                                 $('#basic_constraints_sign_csr').val('');
                         }
-                        $('#key_usage_sign_csr').val(data.keyUsage.join(', '));
+                        $('#key_usage_sign_csr option').removeAttr('selected');
+                        if ('keyUsage' in data) {
+                                data.keyUsage.forEach(function(item) {
+                                        console.log('#key_usage_sign_csr_' + item);
+                                        $('#key_usage_sign_csr_' + item).prop('selected', true);
+                                });
+
+                        }
+                        $("#key_usage_sign_csr").selectpicker('refresh');
                         $('#extended_key_usage_sign_csr').val(data.extendedKeyUsage.join(', '));
                         $('#submit').removeClass('hidden');
                 },
@@ -1228,7 +1256,15 @@ $( document ).ready(function() {
                     <!-- TODO: validation, better UI -->
                     <td style="width:22%"><i class="fa fa-info-circle text-muted"></i> <?=gettext('keyUsage');?></td>
                     <td style="width:78%">
-                      <input name="key_usage_sign_csr" type="text" id="key_usage_sign_csr" size="5" value="<?=$pconfig['key_usage_sign_csr'];?>"/>
+                      <select name="key_usage_sign_csr[]" title="Select keyUsages..." multiple="multiple" id="key_usage_sign_csr" class="selectpicker" data-live-search="true" data-size="5" tabindex="2" <?=!empty($pconfig['associated-rule-id']) ? "disabled" : "";?>>
+<?php
+                      foreach ($key_usages as $key => $human_readable): ?>
+                        <option value="<?=$key;?>" id="key_usage_sign_csr_<?=$key;?>">
+                          <?= $human_readable; ?>
+                        </option>
+<?php
+                      endforeach; ?>
+                      </select>
                     </td>
                   </tr>
                   <tr>
