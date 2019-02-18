@@ -378,6 +378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $pconfig['cert'] = null;
     } elseif ($act == "info") {
       if (isset($id)) {
+          header("Content-Type: text/plain;charset=UTF-8");
           // use openssl to dump cert in readable format
           $process = proc_open('/usr/local/bin/openssl x509 -fingerprint -sha256 -text', array(array("pipe", "r"), array("pipe", "w")), $pipes);
           if (is_resource($process)) {
@@ -394,10 +395,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } elseif ($act == 'csr_info') {
       if (!isset($_GET['csr'])) {
         http_response_code(400);
+        header("Content-Type: text/plain;charset=UTF-8");
         echo gettext('Invalid request');
         exit;
       }
 
+      header("Content-Type: text/plain;charset=UTF-8");
       // use openssl to dump csr in readable format
       $process = proc_open('/usr/local/bin/openssl req -text -noout', array(array("pipe", "r"), array("pipe", "w"), array("pipe", "w")), $pipes);
       if (is_resource($process)) {
