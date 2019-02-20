@@ -29,7 +29,7 @@
 
 require_once('guiconfig.inc');
 require_once("system.inc");
-require_once('x509/vendor/autoload.php');
+require_once('phpseclib/vendor/autoload.php');
 
 function csr_generate(&$cert, $keylen, $dn, $digest_alg = 'sha256')
 {
@@ -85,102 +85,70 @@ function csr_get_modulus($str_crt, $decode = true)
     return cert_get_modulus($str_crt, $decode, 'csr');
 }
 
-function parse_csr($csr)
+function parse_csr($csr_str)
 {
     $ret = array();
     $ret['parse_success'] = true;
-    $ret['subject'] = openssl_csr_get_subject($csr);
+    $ret['subject'] = openssl_csr_get_subject($csr_str);
     if ($ret['subject'] === false) {
         return array('parse_success' => false);
     }
 
-    try {
-        $csr_obj = \X509\CertificationRequest\CertificationRequest::fromPEM(Sop\CryptoEncoding\PEM::fromString($csr));
-    } catch (\UnexpectedValueException $e) {
+    $x509_lib = new \phpseclib\File\X509();
+    $csr = $x509_lib->loadCSR($csr_str);
+    if ($csr === false) {
         return array('parse_success' => false);
     }
 
-    $csr_attrs = $csr_obj->certificationRequestInfo()->attributes();
-
-    foreach ($csr_attrs as $attr) {
-        if ($attr instanceof \X501\ASN1\Attribute) {
-            foreach ($attr->values() as $value) {
-                if ($value instanceof \X509\CertificationRequest\Attribute\ExtensionRequestValue) {
-                    foreach ($value->extensions() as $extension) {
-                        if ($extension instanceof \X509\Certificate\Extension\SubjectAlternativeNameExtension) {
-                            $san = array();
-                            foreach ($extension->names() as $name) {
-                                // Supporting DNS, IP, email, and URI
-                                if ($name instanceof \X509\GeneralName\DNSName) {
-                                    array_push($san, array('type'=> 'DNS', 'value'=> $name->name()));
-                                    continue;
+    foreach ($csr['certificationRequestInfo']['attributes'] as $attr) {
+        switch ($attr['type'] ) {
+            case 'pkcs-9-at-extensionRequest':
+                foreach ($attr['value'] as $value) {
+                    foreach ($value as $column) {
+                        switch ($column['extnId']) {
+                            case 'id-ce-basicConstraints':
+                                $ret['basicConstraints'] = array();
+                                $ret['basicConstraints']['CA'] = $column['extnValue']['cA'];
+                                if (isset($column['extnValue']['pathLenConstraint'])) { 
+                                    $ret['basicConstraints']['pathlen'] = (int)($column['extnValue']['pathLenConstraint']->value);
                                 }
-                                if ($name instanceof \X509\GeneralName\IPAddress) {
-                                    // v4 or v6 does not matter here
-                                    array_push($san, array('type'=> 'IP', 'value'=> $name->address()));
-                                    continue;
+
+                                break;
+
+                            case 'id-ce-keyUsage':
+                                $ret['keyUsage'] = $column['extnValue'];
+                                break;
+
+                            case 'id-ce-extKeyUsage':
+                                $ret['extendedKeyUsage'] = array();
+                                foreach ($column['extnValue'] as $usage) {
+                                    array_push($ret['extendedKeyUsage'], strpos($usage, 'id-kp-') === 0 ? $x509_lib->getOID($usage)
+                                                                                                        : $usage);
                                 }
-                                if ($name instanceof \X509\GeneralName\RFC822Name) {
-                                    array_push($san, array('type'=> 'email', 'value'=> $name->email()));
-                                    continue;
+                                break;
+
+                            case 'id-ce-subjectAltName':
+                                $ret['subjectAltName'] = array();
+                                foreach ($column['extnValue'] as $item) {
+                                    if (isset($item['dNSName'])) {
+                                        array_push($ret['subjectAltName'], array('type'=> 'DNS', 'value'=> $item['dNSName']));
+                                    }
+                                    if (isset($item['iPAddress'])) {
+                                        array_push($ret['subjectAltName'], array('type'=> 'IP', 'value'=> $item['iPAddress']));
+                                    }
+                                    if (isset($item['rfc822Name'])) {
+                                        array_push($ret['subjectAltName'], array('type'=> 'email', 'value'=> $item['rfc822Name']));
+                                    }
+                                    if (isset($item['uniformResourceIdentifier'])) {
+                                        array_push($ret['subjectAltName'], array('type'=> 'URI', 'value'=> $item['uniformResourceIdentifier']));
+                                    }
                                 }
-                                if ($name instanceof \X509\GeneralName\UniformResourceIdentifier) {
-                                    array_push($san, array('type'=> 'URI', 'value'=> $name->uri()));
-                                    continue;
-                                }
-                            }
-                            $ret['subjectAltName'] = $san;
+                                break;
+                                
                         }
-                        if ($extension instanceof \X509\Certificate\Extension\KeyUsageExtension) {
-                            $keyusages = array();
-                            // TODO: check all of them are correct in openssl.cnf, and has no typos
-                            if ($extension->isDigitalSignature()) {
-                                array_push($keyusages, 'digitalSignature');
-                            }
-                            if ($extension->isNonRepudiation()) {
-                                array_push($keyusages, 'nonRepudiation');
-                            }
-                            if ($extension->isKeyEncipherment()) {
-                                array_push($keyusages, 'keyEncipherment');
-                            }
-                            if ($extension->isDataEncipherment()) {
-                                array_push($keyusages, 'dataEncipherment');
-                            }
-                            if ($extension->isKeyAgreement()) {
-                                array_push($keyusages, 'keyAgreement');
-                            }
-                            if ($extension->isKeyCertSign()) {
-                                array_push($keyusages, 'keyCertSign');
-                            }
-                            if ($extension->isCRLSign()) {
-                                array_push($keyusages, 'cRLSign');
-                            }
-                            if ($extension->isEncipherOnly()) {
-                                array_push($keyusages, 'encipherOnly');
-                            }
-
-                            $ret['keyUsage'] = $keyusages;
-                            continue;
-                        }
-
-                        if ($extension instanceof \X509\Certificate\Extension\ExtendedKeyUsageExtension) {
-                            $ret['extendedKeyUsage'] = $extension->purposes();
-                            continue;
-                        }
-
-                        if ($extension instanceof \X509\Certificate\Extension\BasicConstraintsExtension) {
-                            $ret['basicConstraints'] = array();
-                            $ret['basicConstraints']['CA'] = $extension->isCA();
-                            if ($extension->hasPathLen()) { 
-                                $ret['basicConstraints']['pathlen'] = $extension->pathLen();
-                            }
-                            continue;
-                        }
-
-                        // x509 extensions which is not listed here is currently not supported.
                     }
                 }
-            }
+                break; // case 'pkcs-9-at-extensionRequest'
         }
     }
 
